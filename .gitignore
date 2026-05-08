@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+*.db
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Worktrees
+.worktrees/
+
+# OS
+.DS_Store
