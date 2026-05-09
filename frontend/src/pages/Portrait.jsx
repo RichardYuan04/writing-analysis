@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getPortrait, deepAnalysis, essayDeepAnalysis } from '../api'
+import { getPortrait, essayDeepAnalysis } from '../api'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import EssayPicker from '../components/EssayPicker'
 import {
@@ -9,9 +9,7 @@ import {
 
 export default function Portrait() {
   const [portrait, setPortrait] = useState(null)
-  const [analysis, setAnalysis] = useState('')
   const [loading, setLoading] = useState(true)
-  const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState('')
 
   // 单篇深度解读状态
@@ -27,19 +25,6 @@ export default function Portrait() {
         setLoading(false)
       })
   }, [])
-
-  const handleDeepAnalysis = async () => {
-    setAnalyzing(true)
-    setAnalysis('')
-    try {
-      const r = await deepAnalysis()
-      setAnalysis(r.data.analysis)
-    } catch (e) {
-      setAnalysis('调用失败，请检查 API Key 是否正确')
-    } finally {
-      setAnalyzing(false)
-    }
-  }
 
   const handleEssayDeepAnalysis = async (essayId, title) => {
     setDeepResult(null)
@@ -82,16 +67,12 @@ export default function Portrait() {
         </ResponsiveContainer>
       </div>
 
-      {/* 灵魂词汇 */}
-      {portrait.soul_words?.length > 0 && (
+      {/* 灵魂词汇（按词性分类） */}
+      {portrait.soul_words_by_pos && (
         <div className="section">
           <h2>灵魂词汇</h2>
           <p className="section-desc">跨越多篇文章反复出现的词，构成你写作的 DNA</p>
-          <div className="soul-words">
-            {portrait.soul_words.map(w => (
-              <span key={w} className="soul-word">{w}</span>
-            ))}
-          </div>
+          <SoulWordsByPos data={portrait.soul_words_by_pos} />
         </div>
       )}
 
@@ -111,30 +92,7 @@ export default function Portrait() {
         </div>
       </div>
 
-      {/* 原有深度解读（保留） */}
-      <div className="section deep-section">
-        <h2>深度解读 · 像哪位作家</h2>
-        <p className="section-desc">由 Claude AI 基于全部随笔生成文学肖像</p>
-        {!analysis && (
-          <button className="deep-btn" onClick={handleDeepAnalysis} disabled={analyzing}>
-            {analyzing ? '正在分析，稍等片刻...' : '✨ 开始深度解读'}
-          </button>
-        )}
-        {analysis && (
-          <div className="analysis-result">
-            {analysis.split('\n').map((line, i) => (
-              <p key={i} className={line.startsWith('**') ? 'analysis-heading' : 'analysis-body'}>
-                {line.replace(/\*\*/g, '')}
-              </p>
-            ))}
-            <button className="reset-btn" style={{ marginTop: 16 }} onClick={handleDeepAnalysis}>
-              重新生成
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 新：单篇深度解读 */}
+      {/* 单篇深度解读 */}
       <div className="section">
         <h2>单篇深度解读</h2>
         <p className="section-desc">选择一篇随笔，由 Gemini AI 生成六维度文学分析</p>
@@ -175,6 +133,38 @@ function DimRow({ icon, label, value }) {
       <span className="dim-icon">{icon}</span>
       <span className="dim-label">{label}</span>
       <span className="dim-value">{value}</span>
+    </div>
+  )
+}
+
+const POS_GROUPS = [
+  { key: 'nouns', label: '名词' },
+  { key: 'verbs', label: '动词' },
+  { key: 'adjs',  label: '形容词' },
+]
+
+function SoulWordsByPos({ data }) {
+  const hasAny = POS_GROUPS.some(g => data[g.key]?.length > 0)
+  if (!hasAny) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {POS_GROUPS.map(({ key, label }) => {
+        const words = data[key] || []
+        if (words.length === 0) return null
+        return (
+          <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 10, color: '#a89070', letterSpacing: '0.1em',
+              whiteSpace: 'nowrap', width: 36, flexShrink: 0,
+            }}>{label}</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {words.map(w => (
+                <span key={w} className="soul-word">{w}</span>
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

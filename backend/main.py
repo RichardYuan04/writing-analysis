@@ -89,10 +89,27 @@ setup_fts()
 
 
 # 停用词
-STOPWORDS = set(["的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一", "一个",
-                  "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有", "看", "好",
-                  "自己", "这", "那", "们", "与", "及", "或", "但", "而", "因为", "所以", "如果",
-                  "虽然", "然后", "但是", "这个", "那个", "什么", "怎么", "为什么", "这样", "那样"])
+STOPWORDS = set([
+    # 助词、虚词
+    "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一", "一个",
+    "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有", "看", "好",
+    "自己", "这", "那", "们", "与", "及", "或", "但", "而", "因为", "所以", "如果",
+    "虽然", "然后", "但是", "这个", "那个", "什么", "怎么", "为什么", "这样", "那样",
+    # 代词、指示词（无实义）
+    "其他", "其它", "其中", "这里", "那里", "这边", "那边", "这些", "那些", "一些",
+    "各种", "一种", "这种", "那种", "某些", "有些", "如此", "如何", "一样", "哪些",
+    "此外", "另外", "以及", "并且", "不过", "只是", "而且", "即使", "比较",
+    # 否定/助动词组合（无区分度）
+    "不会", "不能", "不是", "不用", "不要", "不必", "不得", "不行",
+    "没有", "没能", "没法",
+    # 泛义动词/形容词（高频但无区分度）
+    "觉得", "认为", "知道", "感觉", "发现", "看到", "想到", "开始", "继续", "已经",
+    "非常", "可能", "应该", "需要", "能够", "可以", "特别", "确实", "真的",
+    "一直", "一定", "甚至", "不断", "不停", "有点", "有些", "有时", "显得",
+    # 泛义名词
+    "时候", "地方", "方面", "问题", "东西", "事情", "情况", "方式", "方法", "内容",
+    "原因", "结果", "过程", "意思", "感受", "状态", "方向",
+])
 
 def analyze_text(content: str):
     words = [w for w in jieba.cut(content) if len(w) > 1 and w not in STOPWORDS]
@@ -413,15 +430,31 @@ def compute_portrait(essays):
         volume_style = "每篇篇幅简短，倾向精炼表达"
     else:
         volume_style = "篇幅适中"
-    essay_word_sets = []
+    # 灵魂词汇：按词性分类，统计跨篇出现次数
+    pos_buckets = {"n": Counter(), "v": Counter(), "a": Counter()}  # 名词/动词/形容词
+    essay_word_pos = []  # 每篇的 {word: flag} 去重集合
     for e in essays:
-        ws = set(w for w in jieba.cut(e.content) if len(w) > 1 and w not in STOPWORDS)
-        essay_word_sets.append(ws)
-    word_essay_count = Counter()
-    for ws in essay_word_sets:
-        for w in ws:
-            word_essay_count[w] += 1
-    soul_words = [w for w, c in word_essay_count.most_common(20) if c >= max(2, len(essays) // 3)][:6]
+        word_pos_set = {}
+        for word, flag in pseg.cut(e.content):
+            if len(word) < 2 or word in STOPWORDS:
+                continue
+            root = flag[0] if flag else ""
+            if root in ("n", "v", "a"):
+                word_pos_set[word] = root
+        essay_word_pos.append(word_pos_set)
+
+    # 统计每个词出现在几篇文章里
+    cross_count = {"n": Counter(), "v": Counter(), "a": Counter()}
+    for wp in essay_word_pos:
+        for word, pos in wp.items():
+            cross_count[pos][word] += 1
+
+    threshold = max(2, len(essays) // 3)
+    soul_words_nouns = [w for w, c in cross_count["n"].most_common(30) if c >= threshold][:5]
+    soul_words_verbs = [w for w, c in cross_count["v"].most_common(30) if c >= threshold][:5]
+    soul_words_adjs  = [w for w, c in cross_count["a"].most_common(30) if c >= threshold][:5]
+    # 兼容旧字段：合并列表
+    soul_words = soul_words_nouns + soul_words_verbs + soul_words_adjs
     return {
         "tone": tone,
         "sentence_style": sentence_style,
@@ -436,6 +469,11 @@ def compute_portrait(essays):
         "para_style": para_style,
         "volume_style": volume_style,
         "soul_words": soul_words,
+        "soul_words_by_pos": {
+            "nouns": soul_words_nouns,
+            "verbs": soul_words_verbs,
+            "adjs": soul_words_adjs,
+        },
         "avg_sentiment": round(mean_s, 3),
         "sentiment_std": round(std_s, 3),
         "avg_words_per_essay": round(avg_words),
