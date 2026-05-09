@@ -26,3 +26,10 @@ export const searchEssays = (q, startDate, endDate) => {
 }
 
 export const essayDeepAnalysis = (essayId) => api.post(`/essays/${essayId}/deep-analysis`)
+
+export const getSentimentTimeline = (granularity, startDate, endDate) => {
+  const params = { granularity }
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
+  return api.get('/stats/sentiment-timeline', { params })
+}

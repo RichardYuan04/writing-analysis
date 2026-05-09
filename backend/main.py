@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
-from collections import Counter
+from datetime import datetime, date as date_cls, timedelta
+from collections import Counter, defaultdict
 import jieba
 import jieba.posseg as pseg
 from snownlp import SnowNLP
@@ -17,6 +17,19 @@ from dotenv import load_dotenv
 import anthropic
 from google import genai as google_genai
 from google.genai import types as genai_types
+
+try:
+    from transformers import pipeline as hf_pipeline
+    _bert_pipe = hf_pipeline(
+        "text-classification",
+        model="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
+        top_k=1,
+        device=-1,  # CPU
+    )
+    print("[BERT] 情感分析模型加载完成")
+except Exception as _e:
+    _bert_pipe = None
+    print(f"[BERT] 模型未加载，将跳过 BERT 情感分析：{_e}")
 
 load_dotenv()
 anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -45,6 +58,9 @@ class Essay(Base):
     date = Column(String(10))  # YYYY-MM-DD
     word_count = Column(Integer)
     sentiment_score = Column(Float)
+    sentiment_positive = Column(Float)
+    sentiment_neutral = Column(Float)
+    sentiment_negative = Column(Float)
     created_at = Column(DateTime, default=datetime.now)
 
 Base.metadata.create_all(engine)
@@ -86,6 +102,59 @@ def setup_fts():
         conn.commit()
 
 setup_fts()
+
+
+def migrate_db():
+    """为旧表补加 sentiment 三列（幂等）"""
+    with engine.connect() as conn:
+        for col in ["sentiment_positive", "sentiment_neutral", "sentiment_negative"]:
+            try:
+                conn.execute(text(f"ALTER TABLE essays ADD COLUMN {col} FLOAT"))
+                conn.commit()
+            except Exception:
+                pass  # 列已存在
+
+
+def compute_bert_breakdown(content: str) -> dict:
+    """用 BERT 对文章做情感三分类，返回 {positive, neutral, negative} 百分比。"""
+    if not _bert_pipe:
+        return None
+    sentences = re.split(r'[。！？\n]', content)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 5]
+    if not sentences:
+        return {"positive": 33, "neutral": 34, "negative": 33}
+    results = _bert_pipe(sentences[:40], truncation=True, max_length=128)
+    counts = {"positive": 0, "neutral": 0, "negative": 0}
+    for r in results:
+        label = r[0]["label"].lower()
+        if label in counts:
+            counts[label] += 1
+    n = len(results)
+    pct = {k: round(v / n * 100) for k, v in counts.items()}
+    pct["neutral"] += 100 - sum(pct.values())
+    return pct
+
+
+def migrate_bert_breakdown():
+    """为还没有 BERT 分值的旧文章补算（启动时运行一次）"""
+    if not _bert_pipe:
+        return
+    session = Session()
+    essays = session.query(Essay).filter(Essay.sentiment_positive == None).all()
+    if essays:
+        print(f"[BERT] 补算 {len(essays)} 篇旧文章的情感分布…")
+    for essay in essays:
+        bd = compute_bert_breakdown(essay.content)
+        if bd:
+            essay.sentiment_positive = bd["positive"]
+            essay.sentiment_neutral = bd["neutral"]
+            essay.sentiment_negative = bd["negative"]
+    session.commit()
+    session.close()
+
+
+migrate_db()
+migrate_bert_breakdown()
 
 
 # 停用词
@@ -148,6 +217,7 @@ class EssayCreate(BaseModel):
 @app.post("/essays")
 def create_essay(data: EssayCreate):
     analysis = analyze_text(data.content)
+    bd = compute_bert_breakdown(data.content) or {}
     session = Session()
     essay = Essay(
         title=data.title,
@@ -155,6 +225,9 @@ def create_essay(data: EssayCreate):
         date=data.date,
         word_count=analysis["word_count"],
         sentiment_score=analysis["sentiment"],
+        sentiment_positive=bd.get("positive"),
+        sentiment_neutral=bd.get("neutral"),
+        sentiment_negative=bd.get("negative"),
     )
     session.add(essay)
     session.commit()
@@ -279,11 +352,15 @@ def update_essay(essay_id: int, data: EssayUpdate):
         session.close()
         raise HTTPException(status_code=404, detail="Not found")
     analysis = analyze_text(data.content)
+    bd = compute_bert_breakdown(data.content) or {}
     essay.title = data.title
     essay.content = data.content
     essay.date = data.date
     essay.word_count = analysis["word_count"]
     essay.sentiment_score = analysis["sentiment"]
+    essay.sentiment_positive = bd.get("positive")
+    essay.sentiment_neutral = bd.get("neutral")
+    essay.sentiment_negative = bd.get("negative")
     session.commit()
     result = {"id": essay.id, **data.dict(), **analysis}
     session.close()
@@ -330,6 +407,54 @@ def overview(start_date: str = None, end_date: str = None):
         "sentiment_trend": sentiment_trend,
         "top_words": analysis["top_words"],
     }
+
+
+@app.get("/stats/sentiment-timeline")
+def sentiment_timeline(granularity: str = "month", start_date: str = None, end_date: str = None):
+    """按时间粒度（year/month/week/day）返回情感分布聚合数据。周以周一为起始日。"""
+    session = Session()
+    query = session.query(Essay).filter(Essay.sentiment_positive != None)
+    if start_date:
+        query = query.filter(Essay.date >= start_date)
+    if end_date:
+        query = query.filter(Essay.date <= end_date)
+    essays = query.order_by(Essay.date.asc()).all()
+    session.close()
+
+    if not essays:
+        return []
+
+    def group_key(date_str: str):
+        d = date_cls.fromisoformat(date_str)
+        if granularity == "year":
+            return str(d.year)
+        if granularity == "month":
+            return f"{d.year}-{d.month:02d}"
+        if granularity == "week":
+            monday = d - timedelta(days=d.weekday())  # weekday() 0=周一
+            return f"{monday.month}/{monday.day}～"
+        return f"{d.month}/{d.day}"  # day
+
+    groups: dict = defaultdict(list)
+    # 保留插入顺序（Python 3.7+ dict 有序）
+    for e in essays:
+        groups[group_key(e.date)].append(e)
+
+    result = []
+    for label, group in groups.items():
+        n = len(group)
+        avg_pos = round(sum(e.sentiment_positive for e in group) / n)
+        avg_neu = round(sum(e.sentiment_neutral  for e in group) / n)
+        avg_neg = round(sum(e.sentiment_negative for e in group) / n)
+        avg_neu += 100 - (avg_pos + avg_neu + avg_neg)  # 修正四舍五入差
+        result.append({
+            "label": label,
+            "positive": avg_pos,
+            "neutral":  avg_neu,
+            "negative": avg_neg,
+            "essays":   n,
+        })
+    return result
 
 
 def compute_portrait(essays):
