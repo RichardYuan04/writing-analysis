@@ -17,3 +17,12 @@ export const getOverview = (startDate, endDate) => {
   if (endDate) params.end_date = endDate
   return api.get('/stats/overview', { params })
 }
+
+export const searchEssays = (q, startDate, endDate) => {
+  const params = { q }
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
+  return api.get('/essays/search', { params })
+}
+
+export const essayDeepAnalysis = (essayId) => api.post(`/essays/${essayId}/deep-analysis`)

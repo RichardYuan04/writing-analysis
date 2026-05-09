@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
-import { getPortrait, deepAnalysis } from '../api'
+import { getPortrait, deepAnalysis, essayDeepAnalysis } from '../api'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
+import EssayPicker from '../components/EssayPicker'
+import {
+  AuthorCard, WordCloudPanel, DimensionsPanel,
+  StructureTimeline, KeyPointsPanel, SentimentBar,
+} from '../components/DeepAnalysisResult'
 
 export default function Portrait() {
   const [portrait, setPortrait] = useState(null)
@@ -8,6 +13,11 @@ export default function Portrait() {
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState('')
+
+  // 单篇深度解读状态
+  const [deepResult, setDeepResult] = useState(null)
+  const [deepError, setDeepError] = useState('')
+  const [analyzedTitle, setAnalyzedTitle] = useState('')
 
   useEffect(() => {
     getPortrait()
@@ -31,6 +41,18 @@ export default function Portrait() {
     }
   }
 
+  const handleEssayDeepAnalysis = async (essayId, title) => {
+    setDeepResult(null)
+    setDeepError('')
+    setAnalyzedTitle(title)
+    try {
+      const r = await essayDeepAnalysis(essayId)
+      setDeepResult(r.data)
+    } catch (e) {
+      setDeepError(e.response?.data?.detail || '分析失败，请稍后重试')
+    }
+  }
+
   if (loading) return <div className="loading">画像生成中...</div>
   if (error) return <div className="empty">{error}</div>
   if (!portrait) return null
@@ -46,7 +68,7 @@ export default function Portrait() {
   return (
     <div className="portrait-page">
       <h1 className="portrait-title">你的写作画像</h1>
-      <p className="portrait-sub">基于你全部 {portrait.soul_words ? '随笔' : ''} 的本地分析，无数据上传</p>
+      <p className="portrait-sub">基于你全部随笔的本地分析，无数据上传</p>
 
       {/* 雷达图 */}
       <div className="section">
@@ -89,10 +111,10 @@ export default function Portrait() {
         </div>
       </div>
 
-      {/* 深度解读按钮 */}
+      {/* 原有深度解读（保留） */}
       <div className="section deep-section">
         <h2>深度解读 · 像哪位作家</h2>
-        <p className="section-desc">由 Claude AI 生成文学肖像，并找出与你风格最相近的作家</p>
+        <p className="section-desc">由 Claude AI 基于全部随笔生成文学肖像</p>
         {!analysis && (
           <button className="deep-btn" onClick={handleDeepAnalysis} disabled={analyzing}>
             {analyzing ? '正在分析，稍等片刻...' : '✨ 开始深度解读'}
@@ -108,6 +130,38 @@ export default function Portrait() {
             <button className="reset-btn" style={{ marginTop: 16 }} onClick={handleDeepAnalysis}>
               重新生成
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* 新：单篇深度解读 */}
+      <div className="section">
+        <h2>单篇深度解读</h2>
+        <p className="section-desc">选择一篇随笔，由 Gemini AI 生成六维度文学分析</p>
+
+        <EssayPicker onAnalyze={handleEssayDeepAnalysis} />
+
+        {deepError && (
+          <div style={{
+            marginTop: 16, padding: '12px 16px', background: '#fff5f5',
+            border: '1px solid #fecaca', borderRadius: 8,
+            fontSize: 13, color: '#dc2626',
+          }}>
+            {deepError}
+          </div>
+        )}
+
+        {deepResult && (
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 13, color: '#aaa', borderBottom: '1px solid #ede6da', paddingBottom: 10 }}>
+              《{analyzedTitle}》分析结果
+            </div>
+            <AuthorCard persona={deepResult.literaryPersona} />
+            <WordCloudPanel words={deepResult.wordCloud} />
+            <DimensionsPanel dimensions={deepResult.dimensions} />
+            <StructureTimeline nodes={deepResult.structure.nodes} />
+            <KeyPointsPanel points={deepResult.keyPoints} />
+            <SentimentBar sentiment={deepResult.sentiment} />
           </div>
         )}
       </div>
