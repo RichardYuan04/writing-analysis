@@ -572,8 +572,12 @@ def classify_fragments_with_claude(paragraphs: list) -> list:
             messages=[{"role": "user", "content": prompt}]
         )
         raw = message.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
+        # 去掉 markdown 代码块
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
+        # 提取第一个 JSON 数组（防止前后有多余文字）
+        match = re.search(r"\[.*\]", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
         return json.loads(raw)
     except Exception as e:
         print(f"[vault] classify error: {e}")
@@ -616,15 +620,14 @@ def analyze_essay_fragments(essay_id: int):
             session.add(fragment)
 
         session.commit()
+        with engine.connect() as conn:
+            conn.execute(text("UPDATE essays SET fragments_extracted=1 WHERE id=:id"), {"id": essay_id})
+            conn.commit()
     except Exception as e:
         print(f"[vault] analyze_essay {essay_id} error: {e}")
         session.rollback()
     finally:
         session.close()
-
-    with engine.connect() as conn:
-        conn.execute(text("UPDATE essays SET fragments_extracted=1 WHERE id=:id"), {"id": essay_id})
-        conn.commit()
 
 
 # ── 主题聚类 ──
