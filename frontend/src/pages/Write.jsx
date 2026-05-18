@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createEssay } from '../api'
 
-export default function Write({ onSaved }) {
+export default function Write({ onSaved, prefill }) {
   const today = new Date().toISOString().split('T')[0]
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [date, setDate] = useState(today)
+
+  useEffect(() => {
+    if (prefill) setContent(prefill)
+  }, [prefill])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 

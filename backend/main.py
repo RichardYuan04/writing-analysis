@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -12,6 +12,7 @@ from snownlp import SnowNLP
 import re
 import os
 import statistics
+import json
 from dotenv import load_dotenv
 import anthropic
 
@@ -22,7 +23,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -451,3 +452,364 @@ def deep_analysis():
         "portrait": portrait,
         "analysis": message.content[0].text
     }
+
+
+# ═══════════════════════════════════════════════════════════
+# 半成品仓库（Draft Vault）
+# ═══════════════════════════════════════════════════════════
+
+VALID_CATEGORIES = ["散文苗子", "小说点子", "金句警句", "未完成的思考", "观察笔记"]
+
+# ── 数据模型 ──
+
+class Fragment(Base):
+    __tablename__ = "fragments"
+    id = Column(Integer, primary_key=True)
+    essay_id = Column(Integer)
+    content = Column(Text, nullable=False)
+    categories = Column(Text)       # JSON 数组，如 ["散文苗子"]
+    themes = Column(Text)           # JSON 数组，如 ["父亲"]
+    quality_score = Column(Float)
+    embedding = Column(Text)        # JSON 数组存 float 向量
+    ai_title = Column(Text)
+    ai_hint = Column(Text)          # 续写建议（为"继续想"留扩展空间）
+    user_hidden = Column(Integer, default=0)
+    extracted_at = Column(DateTime, default=datetime.now)
+
+
+class ThemeCluster(Base):
+    __tablename__ = "theme_clusters"
+    id = Column(Integer, primary_key=True)
+    theme_name = Column(Text)
+    fragment_ids = Column(Text)     # JSON 数组，如 [1, 3, 7]
+    updated_at = Column(DateTime, default=datetime.now)
+
+
+# ── DB 迁移（幂等） ──
+
+def migrate_vault_db():
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE essays ADD COLUMN fragments_extracted INTEGER DEFAULT 0"))
+            conn.commit()
+        except Exception:
+            pass
+    Fragment.__table__.create(engine, checkfirst=True)
+    ThemeCluster.__table__.create(engine, checkfirst=True)
+
+
+migrate_vault_db()
+
+# ── Embedding 模型（懒加载） ──
+
+_embedding_model = None
+
+
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        from sentence_transformers import SentenceTransformer
+        _embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+    return _embedding_model
+
+
+def generate_embedding(text_content: str) -> list:
+    model = get_embedding_model()
+    embedding = model.encode(text_content, normalize_embeddings=True)
+    return embedding.tolist()
+
+
+# ── 段落切分 ──
+
+def split_paragraphs(content: str) -> list:
+    parts = re.split(r"\n\n+|\n", content)
+    return [p.strip() for p in parts if len(p.strip()) >= 30]
+
+
+# ── Claude Haiku 批量分类 ──
+
+def classify_fragments_with_claude(paragraphs: list) -> list:
+    if not paragraphs:
+        return []
+
+    numbered = "\n\n".join([f"[{i}] {p}" for i, p in enumerate(paragraphs)])
+
+    prompt = f"""你是写作素材分析师。分析以下编号段落，判断每段是否是"半成品"——即可进一步发展成正式作品的素材。
+
+打分标准（quality_score 0.0-1.0）：
+- 具体性：有具体场景/意象/细节（而非泛泛感慨）
+- 独特性：视角或观察不落俗套
+- 情感厚度：有真实情绪，不是流水账
+- 发展空间：还有可继续展开的余地
+
+类别（从以下枚举中选，可多选）：
+- 散文苗子：有场景或意象，情绪饱满但缺少结尾/升华
+- 小说点子：含人物+冲突+场景中至少两要素
+- 金句警句：独立判断性短句，长度<60字，有概括力
+- 未完成的思考：提出问题但未给答案，含疑问或"也许""不知道"
+- 观察笔记：对外部世界的客观记录，非情绪宣泄
+
+段落列表：
+{numbered}
+
+严格以JSON数组返回，长度必须等于段落数量：
+[
+  {{
+    "index": 0,
+    "is_valuable": true,
+    "categories": ["散文苗子"],
+    "quality_score": 0.82,
+    "ai_title": "建议标题（10字以内，无合适标题则为null）",
+    "ai_hint": "一句话续写建议（20字以内，is_valuable为false则为null）"
+  }}
+]
+只返回JSON数组，不要其他文字。"""
+
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[vault] classify error: {e}")
+        return []
+
+
+# ── 单篇随笔分析 ──
+
+def analyze_essay_fragments(essay_id: int):
+    session = Session()
+    try:
+        essay = session.query(Essay).filter(Essay.id == essay_id).first()
+        if not essay:
+            return
+
+        paragraphs = split_paragraphs(essay.content)
+        classifications = classify_fragments_with_claude(paragraphs) if paragraphs else []
+
+        for item in classifications:
+            if not item.get("is_valuable"):
+                continue
+            idx = item.get("index", 0)
+            if idx >= len(paragraphs):
+                continue
+            cats = [c for c in item.get("categories", []) if c in VALID_CATEGORIES]
+            if not cats:
+                continue
+
+            fragment = Fragment(
+                essay_id=essay_id,
+                content=paragraphs[idx],
+                categories=json.dumps(cats, ensure_ascii=False),
+                themes=json.dumps([], ensure_ascii=False),
+                quality_score=round(item.get("quality_score", 0.5), 3),
+                embedding=json.dumps(generate_embedding(paragraphs[idx])),
+                ai_title=item.get("ai_title"),
+                ai_hint=item.get("ai_hint"),
+                user_hidden=0,
+            )
+            session.add(fragment)
+
+        session.commit()
+    except Exception as e:
+        print(f"[vault] analyze_essay {essay_id} error: {e}")
+        session.rollback()
+    finally:
+        session.close()
+
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE essays SET fragments_extracted=1 WHERE id=:id"), {"id": essay_id})
+        conn.commit()
+
+
+# ── 主题聚类 ──
+
+def recluster_themes():
+    session = Session()
+    try:
+        fragments = session.query(Fragment).filter(Fragment.user_hidden == 0).all()
+        if len(fragments) < 5:
+            return
+
+        import numpy as np
+        import hdbscan
+
+        embeddings = np.array([json.loads(f.embedding) for f in fragments])
+        labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(embeddings)
+
+        cluster_map = {}
+        for fragment, label in zip(fragments, labels):
+            if label == -1:
+                continue
+            cluster_map.setdefault(label, []).append(fragment)
+
+        if not cluster_map:
+            return
+
+        # 给每个簇命名
+        cluster_texts = "\n\n".join([
+            f"簇{label}:\n" + "\n".join([f"- {f.content[:80]}" for f in frags[:3]])
+            for label, frags in cluster_map.items()
+        ])
+        naming_prompt = f"""以下是从日记中提取的几组相关片段，请为每组起一个简洁的主题名（4-8个汉字）。
+
+{cluster_texts}
+
+严格以JSON对象返回，key是簇编号字符串，value是主题名：
+{{"0": "父亲与沉默", "1": "城市孤独感"}}
+只返回JSON，不要其他文字。"""
+
+        message = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            messages=[{"role": "user", "content": naming_prompt}]
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
+        theme_names = json.loads(raw)
+
+        session.query(ThemeCluster).delete()
+        for label, frags in cluster_map.items():
+            session.add(ThemeCluster(
+                theme_name=theme_names.get(str(label), f"主题{label + 1}"),
+                fragment_ids=json.dumps([f.id for f in frags]),
+            ))
+        session.commit()
+    except Exception as e:
+        print(f"[vault] recluster error: {e}")
+        session.rollback()
+    finally:
+        session.close()
+
+
+# ── API 端点 ──
+
+@app.get("/vault/status")
+def vault_status():
+    with engine.connect() as conn:
+        pending = conn.execute(
+            text("SELECT COUNT(*) FROM essays WHERE fragments_extracted = 0 OR fragments_extracted IS NULL")
+        ).scalar()
+    session = Session()
+    try:
+        by_category = {}
+        fragments = session.query(Fragment).filter(Fragment.user_hidden == 0).all()
+        for f in fragments:
+            for cat in json.loads(f.categories or "[]"):
+                by_category[cat] = by_category.get(cat, 0) + 1
+        return {
+            "pending_essays": pending,
+            "total_fragments": len(fragments),
+            "by_category": by_category,
+        }
+    finally:
+        session.close()
+
+
+@app.post("/vault/analyze")
+def vault_analyze():
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id FROM essays WHERE fragments_extracted = 0 OR fragments_extracted IS NULL")
+        ).fetchall()
+    essay_ids = [row[0] for row in rows]
+
+    for essay_id in essay_ids:
+        analyze_essay_fragments(essay_id)
+
+    if essay_ids:
+        recluster_themes()
+
+    return {"analyzed": len(essay_ids)}
+
+
+@app.get("/vault/fragments")
+def list_fragments(category: str = None):
+    session = Session()
+    try:
+        # 加载所有随笔的日期供返回
+        essays_map = {e.id: e.date for e in session.query(Essay).all()}
+
+        fragments = (
+            session.query(Fragment)
+            .filter(Fragment.user_hidden == 0)
+            .order_by(Fragment.quality_score.desc())
+            .all()
+        )
+        result = []
+        for f in fragments:
+            cats = json.loads(f.categories or "[]")
+            if category and category not in cats:
+                continue
+            result.append({
+                "id": f.id,
+                "essay_id": f.essay_id,
+                "essay_date": essays_map.get(f.essay_id),
+                "content": f.content,
+                "categories": cats,
+                "themes": json.loads(f.themes or "[]"),
+                "quality_score": f.quality_score,
+                "ai_title": f.ai_title,
+                "ai_hint": f.ai_hint,
+                "extracted_at": f.extracted_at.isoformat() if f.extracted_at else None,
+            })
+        return result
+    finally:
+        session.close()
+
+
+@app.get("/vault/themes")
+def list_themes():
+    session = Session()
+    try:
+        clusters = session.query(ThemeCluster).order_by(ThemeCluster.updated_at.desc()).all()
+        result = []
+        for c in clusters:
+            frag_ids = json.loads(c.fragment_ids or "[]")
+            frags = (
+                session.query(Fragment)
+                .filter(Fragment.id.in_(frag_ids), Fragment.user_hidden == 0)
+                .all()
+            )
+            result.append({
+                "id": c.id,
+                "theme_name": c.theme_name,
+                "fragment_count": len(frags),
+                "fragments": [
+                    {
+                        "id": f.id,
+                        "content": f.content,
+                        "ai_title": f.ai_title,
+                        "quality_score": f.quality_score,
+                        "categories": json.loads(f.categories or "[]"),
+                    }
+                    for f in frags
+                ],
+            })
+        return result
+    finally:
+        session.close()
+
+
+class FragmentFeedback(BaseModel):
+    hidden: bool
+
+
+@app.patch("/vault/fragments/{fragment_id}")
+def update_fragment_feedback(fragment_id: int, data: FragmentFeedback):
+    session = Session()
+    try:
+        fragment = session.query(Fragment).filter(Fragment.id == fragment_id).first()
+        if not fragment:
+            raise HTTPException(status_code=404, detail="Fragment not found")
+        fragment.user_hidden = 1 if data.hidden else 0
+        session.commit()
+        return {"ok": True}
+    finally:
+        session.close()

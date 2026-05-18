@@ -17,3 +17,19 @@ export const getOverview = (startDate, endDate) => {
   if (endDate) params.end_date = endDate
   return api.get('/stats/overview', { params })
 }
+
+export const getSentimentTimeline = (granularity, startDate, endDate) => {
+  const params = { granularity }
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
+  return api.get('/stats/sentiment-timeline', { params })
+}
+
+export const vaultStatus = () => api.get('/vault/status')
+export const vaultAnalyze = () => api.post('/vault/analyze')
+export const listFragments = (category) => {
+  const params = category ? { category } : {}
+  return api.get('/vault/fragments', { params })
+}
+export const listThemes = () => api.get('/vault/themes')
+export const updateFragmentFeedback = (id, data) => api.patch(`/vault/fragments/${id}`, data)
