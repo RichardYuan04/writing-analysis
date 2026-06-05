@@ -50,6 +50,7 @@ export default function EssayDetail({ id, onBack }) {
   if (loading) return <div className="loading">分析中...</div>
   if (!essay) return null
 
+
   const sentimentLabel = (score) => {
     if (score > 0.65) return '😊 积极'
     if (score < 0.35) return '😔 消极'
@@ -148,9 +149,48 @@ export default function EssayDetail({ id, onBack }) {
                 ))}
               </div>
             </section>
+
+            {essay.emotion_detail && <EmotionBreakdown detail={essay.emotion_detail} />}
           </div>
         </>
       )}
     </div>
+  )
+}
+
+const EMOTION_CONFIG = {
+  joy:         { label: '喜悦', color: '#f59e0b' },
+  gratitude:   { label: '感恩', color: '#10b981' },
+  love:        { label: '爱意', color: '#ec4899' },
+  neutral:     { label: '平静', color: '#94a3b8' },
+  surprise:    { label: '惊奇', color: '#8b5cf6' },
+  sadness:     { label: '悲伤', color: '#3b82f6' },
+  fear:        { label: '恐惧', color: '#6366f1' },
+  anger:       { label: '愤怒', color: '#ef4444' },
+  disgust:     { label: '厌恶', color: '#84cc16' },
+  frustration: { label: '沮丧', color: '#f97316' },
+  contempt:    { label: '轻蔑', color: '#a78bfa' },
+}
+
+function EmotionBreakdown({ detail }) {
+  const sorted = Object.entries(detail)
+    .map(([key, val]) => ({ key, val, ...EMOTION_CONFIG[key] }))
+    .sort((a, b) => b.val - a.val)
+
+  return (
+    <section className="section">
+      <h2>情绪分布</h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+        {sorted.map(({ key, label, val, color }) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 42, fontSize: 12, color: '#888', textAlign: 'right', flexShrink: 0 }}>{label}</span>
+            <div style={{ flex: 1, background: '#f0ebe3', borderRadius: 4, height: 10, overflow: 'hidden' }}>
+              <div style={{ width: `${val}%`, background: color, height: '100%', borderRadius: 4, transition: 'width 0.4s ease' }} />
+            </div>
+            <span style={{ width: 36, fontSize: 12, color: '#888', flexShrink: 0 }}>{val}%</span>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }

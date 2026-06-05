@@ -8,7 +8,6 @@ from datetime import datetime, date as date_cls, timedelta
 from collections import Counter, defaultdict
 import jieba
 import jieba.posseg as pseg
-from snownlp import SnowNLP
 import re
 import os
 import statistics
@@ -18,18 +17,23 @@ import anthropic
 from google import genai as google_genai
 from google.genai import types as genai_types
 
+POSITIVE_EMOTIONS = {"joy", "gratitude", "love"}
+NEUTRAL_EMOTIONS  = {"neutral", "surprise"}
+NEGATIVE_EMOTIONS = {"anger", "contempt", "disgust", "fear", "frustration", "sadness"}
+ALL_EMOTIONS = POSITIVE_EMOTIONS | NEUTRAL_EMOTIONS | NEGATIVE_EMOTIONS
+
 try:
     from transformers import pipeline as hf_pipeline
-    _bert_pipe = hf_pipeline(
+    _emotion_pipe = hf_pipeline(
         "text-classification",
-        model="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
-        top_k=1,
-        device=-1,  # CPU
+        model="tabularisai/multilingual-emotion-classification",
+        top_k=None,
+        device=-1,
     )
-    print("[BERT] 情感分析模型加载完成")
+    print("[Emotion] 多维情绪模型加载完成")
 except Exception as _e:
-    _bert_pipe = None
-    print(f"[BERT] 模型未加载，将跳过 BERT 情感分析：{_e}")
+    _emotion_pipe = None
+    print(f"[Emotion] 模型未加载：{_e}")
 
 load_dotenv()
 anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -61,6 +65,7 @@ class Essay(Base):
     sentiment_positive = Column(Float)
     sentiment_neutral = Column(Float)
     sentiment_negative = Column(Float)
+    emotion_detail = Column(Text)   # JSON: {joy, gratitude, love, neutral, surprise, anger, ...}
     created_at = Column(DateTime, default=datetime.now)
 
 Base.metadata.create_all(engine)
@@ -105,56 +110,78 @@ setup_fts()
 
 
 def migrate_db():
-    """为旧表补加 sentiment 三列（幂等）"""
+    """为旧表补加新列（幂等）"""
     with engine.connect() as conn:
-        for col in ["sentiment_positive", "sentiment_neutral", "sentiment_negative"]:
+        for col, typ in [
+            ("sentiment_positive", "FLOAT"),
+            ("sentiment_neutral",  "FLOAT"),
+            ("sentiment_negative", "FLOAT"),
+            ("emotion_detail",     "TEXT"),
+        ]:
             try:
-                conn.execute(text(f"ALTER TABLE essays ADD COLUMN {col} FLOAT"))
+                conn.execute(text(f"ALTER TABLE essays ADD COLUMN {col} {typ}"))
                 conn.commit()
             except Exception:
                 pass  # 列已存在
 
 
-def compute_bert_breakdown(content: str) -> dict:
-    """用 BERT 对文章做情感三分类，返回 {positive, neutral, negative} 百分比。"""
-    if not _bert_pipe:
+def compute_emotion_breakdown(content: str):
+    """用 tabularisai 模型做11类情绪分析，返回 detail + 三色分布 + sentiment_score。"""
+    if not _emotion_pipe:
         return None
     sentences = re.split(r'[。！？\n]', content)
     sentences = [s.strip() for s in sentences if len(s.strip()) > 5]
     if not sentences:
-        return {"positive": 33, "neutral": 34, "negative": 33}
-    results = _bert_pipe(sentences[:40], truncation=True, max_length=128)
-    counts = {"positive": 0, "neutral": 0, "negative": 0}
-    for r in results:
-        label = r[0]["label"].lower()
-        if label in counts:
-            counts[label] += 1
+        return None
+    results = _emotion_pipe(sentences[:40], truncation=True, max_length=128)
+    totals = {e: 0.0 for e in ALL_EMOTIONS}
+    for sentence_scores in results:
+        for item in sentence_scores:
+            label = item["label"].lower()
+            if label in totals:
+                totals[label] += item["score"]
     n = len(results)
-    pct = {k: round(v / n * 100) for k, v in counts.items()}
-    pct["neutral"] += 100 - sum(pct.values())
-    return pct
+    avg = {k: v / n for k, v in totals.items()}
+    total = sum(avg.values()) or 1.0
+    norm = {k: v / total for k, v in avg.items()}
+    positive = sum(norm[e] for e in POSITIVE_EMOTIONS)
+    neutral  = sum(norm[e] for e in NEUTRAL_EMOTIONS)
+    negative = sum(norm[e] for e in NEGATIVE_EMOTIONS)
+    # sentiment_score = joy + gratitude + love + neutral + surprise
+    sentiment_score = positive + neutral
+    return {
+        "detail": {k: round(v * 100, 1) for k, v in norm.items()},
+        "positive": round(positive * 100),
+        "neutral":  round(neutral * 100),
+        "negative": round(negative * 100),
+        "sentiment_score": round(sentiment_score, 3),
+    }
 
 
-def migrate_bert_breakdown():
-    """为还没有 BERT 分值的旧文章补算（启动时运行一次）"""
-    if not _bert_pipe:
+def migrate_emotion_breakdown():
+    """启动时为没有 emotion_detail 的旧文章补算（幂等）"""
+    if not _emotion_pipe:
         return
     session = Session()
-    essays = session.query(Essay).filter(Essay.sentiment_positive == None).all()
-    if essays:
-        print(f"[BERT] 补算 {len(essays)} 篇旧文章的情感分布…")
-    for essay in essays:
-        bd = compute_bert_breakdown(essay.content)
-        if bd:
-            essay.sentiment_positive = bd["positive"]
-            essay.sentiment_neutral = bd["neutral"]
-            essay.sentiment_negative = bd["negative"]
-    session.commit()
-    session.close()
+    try:
+        essays = session.query(Essay).filter(Essay.emotion_detail == None).all()
+        if essays:
+            print(f"[Emotion] 补算 {len(essays)} 篇旧文章的情绪分布…")
+        for essay in essays:
+            em = compute_emotion_breakdown(essay.content)
+            if em:
+                essay.sentiment_score    = em["sentiment_score"]
+                essay.sentiment_positive = em["positive"]
+                essay.sentiment_neutral  = em["neutral"]
+                essay.sentiment_negative = em["negative"]
+                essay.emotion_detail     = json.dumps(em["detail"])
+        session.commit()
+    finally:
+        session.close()
 
 
 migrate_db()
-migrate_bert_breakdown()
+migrate_emotion_breakdown()
 
 
 # 停用词
@@ -187,11 +214,6 @@ def analyze_text(content: str):
     top_words = [{"word": w, "count": c} for w, c in freq.most_common(50)]
     sentences = re.split(r'[。！？\n]', content)
     sentences = [s.strip() for s in sentences if len(s.strip()) > 5]
-    if sentences:
-        scores = [SnowNLP(s).sentiments for s in sentences[:20]]
-        sentiment = sum(scores) / len(scores)
-    else:
-        sentiment = 0.5
     pos_counts = Counter()
     for word, flag in pseg.cut(content):
         if flag.startswith('n'):
@@ -203,7 +225,6 @@ def analyze_text(content: str):
     return {
         "word_count": word_count,
         "top_words": top_words,
-        "sentiment": round(sentiment, 3),
         "pos_distribution": dict(pos_counts),
     }
 
@@ -217,17 +238,18 @@ class EssayCreate(BaseModel):
 @app.post("/essays")
 def create_essay(data: EssayCreate):
     analysis = analyze_text(data.content)
-    bd = compute_bert_breakdown(data.content) or {}
+    em = compute_emotion_breakdown(data.content) or {}
     session = Session()
     essay = Essay(
         title=data.title,
         content=data.content,
         date=data.date,
         word_count=analysis["word_count"],
-        sentiment_score=analysis["sentiment"],
-        sentiment_positive=bd.get("positive"),
-        sentiment_neutral=bd.get("neutral"),
-        sentiment_negative=bd.get("negative"),
+        sentiment_score=em.get("sentiment_score", 0.5),
+        sentiment_positive=em.get("positive"),
+        sentiment_neutral=em.get("neutral"),
+        sentiment_negative=em.get("negative"),
+        emotion_detail=json.dumps(em["detail"]) if em.get("detail") else None,
     )
     session.add(essay)
     session.commit()
@@ -263,21 +285,21 @@ def search_essays(q: str = "", start_date: str = None, end_date: str = None):
     try:
         if q.strip():
             rows = session.execute(text("""
-                SELECT id, title, date, word_count, content
+                SELECT id, title, date, word_count, sentiment_score, content
                 FROM essays
                 WHERE (title LIKE :q OR content LIKE :q)
                 ORDER BY date DESC
             """), {"q": f"%{q.strip()}%"}).fetchall()
         else:
             rows = session.execute(text("""
-                SELECT id, title, date, word_count, content
+                SELECT id, title, date, word_count, sentiment_score, content
                 FROM essays
                 ORDER BY date DESC
             """)).fetchall()
 
         result = []
         for row in rows:
-            essay_id, title, date, word_count, content = row
+            essay_id, title, date, word_count, sentiment_score, content = row
             if start_date and date < start_date:
                 continue
             if end_date and date > end_date:
@@ -295,6 +317,7 @@ def search_essays(q: str = "", start_date: str = None, end_date: str = None):
                 "title": title,
                 "date": date,
                 "word_count": word_count,
+                "sentiment_score": sentiment_score,
                 "snippet": snippet,
             })
         return result
@@ -332,6 +355,8 @@ def get_essay(essay_id: int):
         "title": essay.title,
         "content": essay.content,
         "date": essay.date,
+        "sentiment": essay.sentiment_score,
+        "emotion_detail": json.loads(essay.emotion_detail) if essay.emotion_detail else None,
         **analysis,
     }
     session.close()
@@ -352,15 +377,16 @@ def update_essay(essay_id: int, data: EssayUpdate):
         session.close()
         raise HTTPException(status_code=404, detail="Not found")
     analysis = analyze_text(data.content)
-    bd = compute_bert_breakdown(data.content) or {}
+    em = compute_emotion_breakdown(data.content) or {}
     essay.title = data.title
     essay.content = data.content
     essay.date = data.date
     essay.word_count = analysis["word_count"]
-    essay.sentiment_score = analysis["sentiment"]
-    essay.sentiment_positive = bd.get("positive")
-    essay.sentiment_neutral = bd.get("neutral")
-    essay.sentiment_negative = bd.get("negative")
+    essay.sentiment_score    = em.get("sentiment_score", 0.5)
+    essay.sentiment_positive = em.get("positive")
+    essay.sentiment_neutral  = em.get("neutral")
+    essay.sentiment_negative = em.get("negative")
+    essay.emotion_detail     = json.dumps(em["detail"]) if em.get("detail") else None
     session.commit()
     result = {"id": essay.id, **data.dict(), **analysis}
     session.close()
@@ -575,9 +601,9 @@ def compute_portrait(essays):
             cross_count[pos][word] += 1
 
     threshold = max(2, len(essays) // 3)
-    soul_words_nouns = [w for w, c in cross_count["n"].most_common(30) if c >= threshold][:5]
-    soul_words_verbs = [w for w, c in cross_count["v"].most_common(30) if c >= threshold][:5]
-    soul_words_adjs  = [w for w, c in cross_count["a"].most_common(30) if c >= threshold][:5]
+    soul_words_nouns = [w for w, c in cross_count["n"].most_common(30) if c >= threshold][:10]
+    soul_words_verbs = [w for w, c in cross_count["v"].most_common(30) if c >= threshold][:10]
+    soul_words_adjs  = [w for w, c in cross_count["a"].most_common(30) if c >= threshold][:10]
     # 兼容旧字段：合并列表
     soul_words = soul_words_nouns + soul_words_verbs + soul_words_adjs
     return {
@@ -850,16 +876,16 @@ def recluster_themes():
             return
 
         import numpy as np
-        import hdbscan
+        from sklearn.cluster import KMeans
 
         embeddings = np.array([json.loads(f.embedding) for f in fragments])
-        labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(embeddings)
+        # 簇数：每6-8个片段一组，上限10组，下限3组
+        n_clusters = max(3, min(10, len(fragments) // 7))
+        labels = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit_predict(embeddings)
 
         cluster_map = {}
         for fragment, label in zip(fragments, labels):
-            if label == -1:
-                continue
-            cluster_map.setdefault(label, []).append(fragment)
+            cluster_map.setdefault(int(label), []).append(fragment)
 
         if not cluster_map:
             return
@@ -1133,7 +1159,7 @@ def essay_deep_analysis(essay_id: int):
 参考数据（本地统计，仅供参考）：
 - 平均句长：{avg_sent_len} 字
 - 词性分布：{local['pos_distribution']}
-- 情感得分（0-1）：{local['sentiment']}
+- 情感得分（0-1）：{round(essay.sentiment_score, 3) if essay.sentiment_score else 'N/A'}
 
 随笔原文：
 【{essay.date} · {essay.title}】

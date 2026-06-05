@@ -1,14 +1,14 @@
 import CalendarHeatmap from 'react-calendar-heatmap'
 import 'react-calendar-heatmap/dist/styles.css'
 
-export default function HeatMap({ data = [] }) {
+export default function HeatMap({ data = [], onPick }) {
   const today = new Date()
   const startDate = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
 
   const values = data.map(d => ({ date: d.date, count: d.word_count }))
 
   return (
-    <div className="heatmap-wrapper">
+    <div className={`heatmap-wrapper${onPick ? ' clickable' : ''}`}>
       <CalendarHeatmap
         startDate={startDate}
         endDate={today}
@@ -20,6 +20,7 @@ export default function HeatMap({ data = [] }) {
           if (value.count > 200) return 'color-scale-2'
           return 'color-scale-1'
         }}
+        onClick={(value) => { if (onPick && value?.date) onPick(value.date) }}
         tooltipDataAttrs={(value) => ({
           'data-tip': value?.date ? `${value.date}: ${value.count} 字` : '未写作',
         })}

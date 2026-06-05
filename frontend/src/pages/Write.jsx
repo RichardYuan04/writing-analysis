@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createEssay } from '../api'
 
-export default function Write({ onSaved, prefill }) {
+export default function Write({ onSaved, prefill, onBack }) {
   const today = new Date().toISOString().split('T')[0]
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -28,6 +28,9 @@ export default function Write({ onSaved, prefill }) {
 
   return (
     <div className="write-page">
+      {onBack && (
+        <button className="back-btn" onClick={onBack}>← 返回仓库</button>
+      )}
       <div className="write-header">
         <input
           className="title-input"

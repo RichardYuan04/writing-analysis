@@ -37,7 +37,7 @@ export default function App() {
         {page === 'overview' && <Overview onSelect={(id) => navigate('detail', id)} onWrite={() => navigateToWrite()} />}
         {page === 'portrait' && <Portrait />}
         {page === 'vault' && <DraftVault onWrite={(prefill) => navigateToWrite(prefill)} />}
-        {page === 'write' && <Write onSaved={() => navigate('overview')} prefill={writePrefill} />}
+        {page === 'write' && <Write onSaved={() => navigate('overview')} prefill={writePrefill} onBack={writePrefill ? () => navigate('vault') : null} />}
         {page === 'detail' && <EssayDetail id={selectedId} onBack={() => navigate('overview')} />}
       </main>
     </div>
