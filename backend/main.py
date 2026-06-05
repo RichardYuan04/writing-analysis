@@ -1183,3 +1183,14 @@ def essay_deep_analysis(essay_id: int):
         raise HTTPException(status_code=500, detail="AI 返回格式异常，请重试")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析失败：{str(e)}")
+
+
+# ── 托管编译后的前端（Phase 0：单进程同源提供前端 + API）──
+# 必须放在所有 API 路由注册之后，避免根挂载抢占接口路由。
+_DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
+if os.path.isdir(_DIST_DIR):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=_DIST_DIR, html=True), name="frontend")
+    print(f"[Frontend] 已托管前端静态文件：{_DIST_DIR}")
+else:
+    print(f"[Frontend] 未找到前端构建产物（{_DIST_DIR}），仅提供 API。先在 frontend/ 运行 npm run build")

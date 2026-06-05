@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: 'http://localhost:8000' })
+// 开发时前端在 5173、后端在 8000，用绝对地址；
+// 生产构建由 FastAPI 同源托管，用相对路径（也方便桌面 app 动态端口）
+const api = axios.create({
+  baseURL: import.meta.env.PROD ? '' : 'http://localhost:8000',
+})
 
 export const createEssay = (data) => api.post('/essays', data)
 export const updateEssay = (id, data) => api.put(`/essays/${id}`, data)
