@@ -942,10 +942,12 @@ def vault_status():
         for f in fragments:
             for cat in json.loads(f.categories or "[]"):
                 by_category[cat] = by_category.get(cat, 0) + 1
+        hidden_count = session.query(Fragment).filter(Fragment.user_hidden == 1).count()
         return {
             "pending_essays": pending,
             "total_fragments": len(fragments),
             "by_category": by_category,
+            "hidden_count": hidden_count,
         }
     finally:
         session.close()
@@ -969,7 +971,7 @@ def vault_analyze():
 
 
 @app.get("/vault/fragments")
-def list_fragments(category: str = None):
+def list_fragments(category: str = None, hidden_only: bool = False):
     session = Session()
     try:
         # 加载所有随笔的日期供返回
@@ -977,7 +979,7 @@ def list_fragments(category: str = None):
 
         fragments = (
             session.query(Fragment)
-            .filter(Fragment.user_hidden == 0)
+            .filter(Fragment.user_hidden == (1 if hidden_only else 0))
             .order_by(Fragment.quality_score.desc())
             .all()
         )

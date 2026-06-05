@@ -36,8 +36,10 @@ export const getSentimentTimeline = (granularity, startDate, endDate) => {
 
 export const vaultStatus = () => api.get('/vault/status')
 export const vaultAnalyze = () => api.post('/vault/analyze')
-export const listFragments = (category) => {
-  const params = category ? { category } : {}
+export const listFragments = (category, hiddenOnly = false) => {
+  const params = {}
+  if (category) params.category = category
+  if (hiddenOnly) params.hidden_only = true
   return api.get('/vault/fragments', { params })
 }
 export const listThemes = () => api.get('/vault/themes')

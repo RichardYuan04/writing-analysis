@@ -12,12 +12,15 @@ const CAT_CONFIG = {
 const ALL_CATS = Object.keys(CAT_CONFIG)
 
 export default function DraftVault({ onWrite }) {
-  const [status, setStatus] = useState({ pending_essays: 0, total_fragments: 0, by_category: {} })
+  const [status, setStatus] = useState({ pending_essays: 0, total_fragments: 0, by_category: {}, hidden_count: 0 })
   const [fragments, setFragments] = useState([])
   const [themes, setThemes] = useState([])
   const [view, setView] = useState('cat')          // 'cat' | 'theme'
   const [activecat, setActiveCat] = useState(null) // null = 全部
   const [analyzing, setAnalyzing] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)   // 是否在「已隐藏」视图
+  const [hiddenFragments, setHiddenFragments] = useState([])
+  const [hiddenCat, setHiddenCat] = useState(null)      // 已隐藏视图的类别筛选
 
   const loadAll = useCallback(async () => {
     try {
@@ -47,7 +50,33 @@ export default function DraftVault({ onWrite }) {
   const handleHide = async (id) => {
     await updateFragmentFeedback(id, { hidden: true })
     setFragments(prev => prev.filter(f => f.id !== id))
-    setStatus(prev => ({ ...prev, total_fragments: prev.total_fragments - 1 }))
+    setStatus(prev => ({
+      ...prev,
+      total_fragments: prev.total_fragments - 1,
+      hidden_count: (prev.hidden_count || 0) + 1,
+    }))
+  }
+
+  const openHidden = async () => {
+    setShowHidden(true)
+    setHiddenCat(null)
+    try {
+      const res = await listFragments(null, true)
+      setHiddenFragments(res.data)
+    } catch (e) {
+      console.error('load hidden error', e)
+    }
+  }
+
+  const handleRestore = async (id) => {
+    await updateFragmentFeedback(id, { hidden: false })
+    const next = hiddenFragments.filter(f => f.id !== id)
+    setHiddenFragments(next)
+    if (next.length === 0) setShowHidden(false)  // 全部清空则退回常规视图
+    else if (hiddenCat && !next.some(f => f.categories.includes(hiddenCat))) {
+      setHiddenCat(null)                          // 当前类别已空则回到「全部」
+    }
+    await loadAll()                               // 恢复的片段重新出现在仓库
   }
 
   const handleContinue = (fragment) => {
@@ -57,6 +86,10 @@ export default function DraftVault({ onWrite }) {
   const visibleFragments = activecat
     ? fragments.filter(f => f.categories.includes(activecat))
     : fragments
+
+  const visibleHidden = hiddenCat
+    ? hiddenFragments.filter(f => f.categories.includes(hiddenCat))
+    : hiddenFragments
 
   return (
     <div className="overview">
@@ -125,8 +158,8 @@ export default function DraftVault({ onWrite }) {
         </div>
       )}
 
-      {/* ── 空状态 ── */}
-      {status.total_fragments === 0 && !analyzing && (
+      {/* ── 空状态（无可见片段且无隐藏片段）── */}
+      {status.total_fragments === 0 && (status.hidden_count || 0) === 0 && !analyzing && (
         <div className="empty" style={{ marginTop: 60 }}>
           {status.pending_essays > 0
             ? '点击「分析新随笔」开始提炼片段'
@@ -134,30 +167,98 @@ export default function DraftVault({ onWrite }) {
         </div>
       )}
 
-      {/* ── 有内容时展示视图 ── */}
-      {status.total_fragments > 0 && (
+      {/* ── 有内容（可见或已隐藏）时展示视图 ── */}
+      {(status.total_fragments > 0 || (status.hidden_count || 0) > 0) && (
         <>
-          {/* 视图切换 */}
-          <div style={{
-            display: 'flex', gap: 2, background: '#ede6da',
-            borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 20,
-          }}>
-            {[['cat', '按类别'], ['theme', '按主题']].map(([v, label]) => (
-              <div key={v} onClick={() => setView(v)} style={{
-                padding: '5px 16px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                color: view === v ? '#3d2b1a' : '#8a7a6a',
-                background: view === v ? 'white' : 'transparent',
-                fontWeight: view === v ? 500 : 400,
-                boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.12s',
-              }}>
-                {label}
+          {/* 视图切换 + 已隐藏入口 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+            <div style={{
+              display: 'flex', gap: 2, background: '#ede6da',
+              borderRadius: 8, padding: 3, width: 'fit-content',
+            }}>
+              {[['cat', '按类别'], ['theme', '按主题']].map(([v, label]) => (
+                <div key={v} onClick={() => { setView(v); setShowHidden(false) }} style={{
+                  padding: '5px 16px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                  color: !showHidden && view === v ? '#3d2b1a' : '#8a7a6a',
+                  background: !showHidden && view === v ? 'white' : 'transparent',
+                  fontWeight: !showHidden && view === v ? 500 : 400,
+                  boxShadow: !showHidden && view === v ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.12s',
+                }}>
+                  {label}
+                </div>
+              ))}
+            </div>
+
+            {(status.hidden_count || 0) > 0 && (
+              <div
+                onClick={() => (showHidden ? setShowHidden(false) : openHidden())}
+                style={{
+                  marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 12, cursor: 'pointer', padding: '5px 12px', borderRadius: 7,
+                  color: showHidden ? '#8B6F47' : '#a89880',
+                  border: `1px ${showHidden ? 'solid' : 'dashed'} ${showHidden ? '#c8b89a' : '#d8ccbb'}`,
+                  background: showHidden ? '#f5ede0' : '#faf8f5',
+                  userSelect: 'none', transition: 'all 0.12s',
+                }}
+              >
+                🗄 已隐藏
+                <span style={{ background: '#e0d5c5', color: '#6a5a4a', borderRadius: 999, fontSize: 10, padding: '0 6px', fontWeight: 600 }}>
+                  {status.hidden_count}
+                </span>
               </div>
-            ))}
+            )}
           </div>
 
+          {/* ── 已隐藏视图 ── */}
+          {showHidden && (
+            hiddenFragments.length === 0 ? (
+              <div className="empty">还没有隐藏任何片段</div>
+            ) : (
+              <>
+                {/* 类别筛选 pills（与主页面一致） */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+                  <CategoryPill
+                    label={`全部 ${hiddenFragments.length}`}
+                    active={!hiddenCat}
+                    onClick={() => setHiddenCat(null)}
+                    color="#8B6F47"
+                  />
+                  {ALL_CATS.filter(c => hiddenFragments.some(f => f.categories.includes(c))).map(cat => (
+                    <CategoryPill
+                      key={cat}
+                      label={`${CAT_CONFIG[cat].emoji} ${cat} ${hiddenFragments.filter(f => f.categories.includes(cat)).length}`}
+                      active={hiddenCat === cat}
+                      onClick={() => setHiddenCat(cat)}
+                      color={CAT_CONFIG[cat].text}
+                      bg={CAT_CONFIG[cat].bg}
+                      border={CAT_CONFIG[cat].border}
+                    />
+                  ))}
+                </div>
+
+                {/* 已隐藏片段列表 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {visibleHidden.map(f => (
+                    <FragmentCard
+                      key={f.id}
+                      fragment={f}
+                      hidden
+                      onRestore={handleRestore}
+                    />
+                  ))}
+                </div>
+              </>
+            )
+          )}
+
+          {/* ── 当前没有可见片段（全被隐藏）── */}
+          {!showHidden && status.total_fragments === 0 && (
+            <div className="empty">当前没有可见片段——都在「已隐藏」里，可点开恢复</div>
+          )}
+
           {/* ── 类别视图 ── */}
-          {view === 'cat' && (
+          {!showHidden && status.total_fragments > 0 && view === 'cat' && (
             <>
               {/* 类别筛选 pills */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -195,7 +296,7 @@ export default function DraftVault({ onWrite }) {
           )}
 
           {/* ── 主题视图 ── */}
-          {view === 'theme' && (
+          {!showHidden && status.total_fragments > 0 && view === 'theme' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {themes.length === 0 ? (
                 <div className="empty">主题聚类需要至少 5 个片段才会生成</div>
@@ -230,7 +331,7 @@ function CategoryPill({ label, active, onClick, color, bg, border }) {
   )
 }
 
-function FragmentCard({ fragment, onHide, onContinue }) {
+function FragmentCard({ fragment, onHide, onContinue, onRestore, hidden = false }) {
   const primaryCat = fragment.categories[0]
   const cfg = primaryCat ? CAT_CONFIG[primaryCat] : { color: '#c4b09a' }
   const score = fragment.quality_score || 0
@@ -238,7 +339,8 @@ function FragmentCard({ fragment, onHide, onContinue }) {
 
   return (
     <div style={{
-      background: 'white', border: '1px solid #ede6da', borderRadius: 10,
+      background: hidden ? '#fbfaf7' : 'white',
+      border: `1px solid ${hidden ? '#efe9df' : '#ede6da'}`, borderRadius: 10,
       display: 'flex', overflow: 'hidden',
       transition: 'box-shadow 0.15s',
     }}
@@ -246,12 +348,12 @@ function FragmentCard({ fragment, onHide, onContinue }) {
       onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
     >
       {/* 左侧色条 */}
-      <div style={{ width: 4, background: cfg.color, flexShrink: 0 }} />
+      <div style={{ width: 4, background: hidden ? '#bcae98' : cfg.color, flexShrink: 0 }} />
 
       <div style={{ flex: 1, padding: '14px 16px' }}>
         {/* 顶部：标题 + 质量分 */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#3d2b1a', lineHeight: 1.4 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: hidden ? '#8a7a6a' : '#3d2b1a', lineHeight: 1.4 }}>
             {fragment.ai_title || fragment.categories[0] || '片段'}
           </div>
           <div style={{
@@ -265,7 +367,7 @@ function FragmentCard({ fragment, onHide, onContinue }) {
 
         {/* 正文（最多 4 行） */}
         <div style={{
-          fontSize: 12, color: '#6a5a4a', lineHeight: 1.8, marginBottom: 10,
+          fontSize: 12, color: hidden ? '#9a8a7a' : '#6a5a4a', lineHeight: 1.8, marginBottom: 10,
           display: '-webkit-box', WebkitLineClamp: 4,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
@@ -303,29 +405,44 @@ function FragmentCard({ fragment, onHide, onContinue }) {
         {/* 底部：来源 + 操作 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 10, color: '#bbb' }}>
-            来自 {fragment.essay_date || '—'}
+            来自 {fragment.essay_date || '—'}{hidden ? ' · 已隐藏' : ''}
           </span>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onClick={() => onHide(fragment.id)}
-              style={{
-                padding: '3px 10px', borderRadius: 5, fontSize: 11,
-                border: '1px solid #e0d5c5', background: '#faf8f5',
-                color: '#8B6F47', cursor: 'pointer',
-              }}
-            >
-              隐藏
-            </button>
-            <button
-              onClick={() => onContinue(fragment)}
-              style={{
-                padding: '3px 10px', borderRadius: 5, fontSize: 11,
-                border: '1px solid #8B6F47', background: '#8B6F47',
-                color: 'white', cursor: 'pointer',
-              }}
-            >
-              续写
-            </button>
+            {hidden ? (
+              <button
+                onClick={() => onRestore(fragment.id)}
+                style={{
+                  padding: '3px 10px', borderRadius: 5, fontSize: 11,
+                  border: '1px solid #8a9a6a', background: '#f5f9f0',
+                  color: '#6a8a4a', cursor: 'pointer',
+                }}
+              >
+                ↩ 恢复
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => onHide(fragment.id)}
+                  style={{
+                    padding: '3px 10px', borderRadius: 5, fontSize: 11,
+                    border: '1px solid #e0d5c5', background: '#faf8f5',
+                    color: '#8B6F47', cursor: 'pointer',
+                  }}
+                >
+                  隐藏
+                </button>
+                <button
+                  onClick={() => onContinue(fragment)}
+                  style={{
+                    padding: '3px 10px', borderRadius: 5, fontSize: 11,
+                    border: '1px solid #8B6F47', background: '#8B6F47',
+                    color: 'white', cursor: 'pointer',
+                  }}
+                >
+                  续写
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
