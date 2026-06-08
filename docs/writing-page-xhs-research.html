@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>写作页竞品研究 · 小红书写作类 App 写作页参考实践</title>
+<style>
+  :root{
+    --ink:#1d1d1f; --sub:#6b6b70; --line:#e6e6ea; --bg:#f6f6f4; --card:#ffffff;
+    --accent:#c0392b; --accent2:#2d7d6f; --gold:#b8893a; --soft:#faf8f3;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.75;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:920px;margin:0 auto;padding:0 22px 100px;}
+  header.hero{padding:60px 22px 40px;text-align:center;background:linear-gradient(160deg,#1d1d1f,#2c2c30);color:#fff;}
+  header.hero h1{font-size:30px;margin:0 0 12px;letter-spacing:.5px;}
+  header.hero .meta{color:#b9b9bf;font-size:13.5px;max-width:760px;margin:0 auto;}
+  header.hero .tag{display:inline-block;margin-top:18px;padding:5px 13px;border:1px solid #4a4a52;border-radius:30px;font-size:12px;color:#d7d7dd;}
+  h2{font-size:22px;margin:54px 0 6px;padding-top:10px;}
+  h2 .num{color:var(--accent);font-weight:800;margin-right:8px;}
+  h2+.lead{color:var(--sub);margin:0 0 22px;font-size:14.5px;}
+  h3{font-size:16.5px;margin:28px 0 8px;}
+  p{margin:10px 0;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:680px){.grid{grid-template-columns:1fr;}}
+  .pat{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent2);border-radius:10px;padding:16px 18px;}
+  .pat h4{margin:0 0 6px;font-size:15px;}
+  .pat .ex{color:var(--sub);font-size:12.5px;margin-top:8px;}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;background:var(--card);border-radius:10px;overflow:hidden;}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top;}
+  th{background:#2d2d31;color:#fff;font-weight:600;}
+  tbody tr:nth-child(even){background:var(--soft);}
+  .pill{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0;}
+  .p-fit{background:#e7f4f0;color:#1f6b5c;}
+  .p-care{background:#fdeee0;color:#9a6314;}
+  .p-no{background:#f7e7e6;color:#9c2f25;}
+  .quote{border-left:3px solid var(--gold);padding:4px 0 4px 16px;color:#5a4a2a;font-style:italic;margin:14px 0;background:var(--soft);border-radius:0 8px 8px 0;}
+  .kv{display:flex;gap:10px;margin:6px 0;font-size:13.5px;}
+  .kv b{min-width:96px;color:var(--accent2);}
+  ul{margin:8px 0 8px 0;padding-left:20px;}
+  li{margin:5px 0;}
+  .reco{background:linear-gradient(180deg,#fff,#faf8f3);border:1px solid var(--line);border-radius:14px;padding:22px;margin:16px 0;}
+  .reco .h{font-weight:700;font-size:15px;margin-bottom:6px;}
+  .star{color:var(--gold);}
+  footer{color:var(--sub);font-size:12.5px;text-align:center;margin-top:60px;padding-top:20px;border-top:1px solid var(--line);}
+  .toc{columns:2;font-size:13.5px;color:var(--accent2);}
+  @media(max-width:680px){.toc{columns:1;}}
+  .toc a{color:var(--accent2);text-decoration:none;}
+  .badge{font-size:11px;color:#fff;background:var(--accent);border-radius:5px;padding:1px 7px;margin-left:6px;vertical-align:middle;}
+  code{background:#f0eee9;padding:1px 6px;border-radius:5px;font-size:12.5px;}
+</style>
+</head>
+<body>
+<header class="hero">
+  <h1>写作页竞品研究</h1>
+  <div class="meta">小红书「写作类 App 写作页」参考实践扫描 · 为「文字时光机」写作页迭代提供素材<br>
+  方法：opencli 扒取小红书 → 7 组关键词广搜 → 58 篇去重 → 13 篇精读 → 约 49 张界面截图读图归纳</div>
+  <div class="tag">Plan A · 广搜找模式 · 图片看完即焚</div>
+</header>
+
+<div class="wrap">
+
+<div class="card">
+  <strong>目录</strong>
+  <div class="toc" style="margin-top:10px;">
+    <a href="#m">① 研究方法与样本</a><br>
+    <a href="#w">② 写手到底在比写作页的什么</a><br>
+    <a href="#lib">③ 写作页设计模式库（6 类）</a><br>
+    <a href="#apps">④ 标杆 App 写作页速写</a><br>
+    <a href="#map">⑤ 映射到「文字时光机」的建议</a><br>
+    <a href="#next">⑥ 下一步</a>
+  </div>
+</div>
+
+<h2 id="m"><span class="num">①</span>研究方法与样本</h2>
+<p class="lead">不是「哪个 App 好用」的清单，而是聚焦写作页（编辑界面）的交互实践。</p>
+<div class="card">
+  <div class="kv"><b>工具链路</b><span>opencli（登录态 Chrome）→ <code>xiaohongshu search</code> 广搜 → <code>xiaohongshu download</code> 取配图 → Claude 读图归纳</span></div>
+  <div class="kv"><b>关键词</b><span>写作软件界面 / 码字软件界面 / 码字沉浸模式 / 写作app体验 / 写作专注模式 / 码字软件推荐界面 / 小说写作软件界面</span></div>
+  <div class="kv"><b>样本</b><span>84 条原始结果 → 去重 58 篇 → 按点赞量挑 13 篇精读 → 约 49 张界面截图逐张读图</span></div>
+  <div class="kv"><b>覆盖 App</b><span>百灵创作、口袋写作、好好码字、锦鲤写作、纯纯写作、WonderPen 妙笔、云上写作、Effie、Obsidian（WebNovel Assistant 插件）、量子探险、Koan、幕布、故事织机、八度幻想、石墨文档、Pages、橙瓜码字、番茄作家助手、Zine、稿定设计…</span></div>
+  <div class="kv"><b>隐私</b><span>所有下载图片仅存 <code>/tmp/xhs-research/</code>，归纳完已整目录删除（看完即焚，未落盘到任何持久目录）。</span></div>
+</div>
+<p style="color:var(--sub);font-size:13px;">⚠️ 样本以<strong>网文/小说写手</strong>为主（小红书写作话题主流人群），他们的需求比「个人随笔/日记」更重工程化。下文第 ⑤ 节专门做了「该不该借鉴」的过滤。</p>
+
+<h2 id="w"><span class="num">②</span>写手到底在比写作页的什么</h2>
+<p class="lead">从多篇「功能对比表」笔记里，反复出现的横向对比维度——这就是用户心智里写作页的「打分项」。</p>
+<table>
+  <thead><tr><th>对比维度</th><th>含义</th><th>出现频率</th></tr></thead>
+  <tbody>
+    <tr><td><b>小黑屋 / 强制写作模式</b></td><td>设定字数或时间目标，未达成不可退出/删除，锁死专注</td><td>几乎每篇对比表都列为独立一栏 ★★★</td></tr>
+    <tr><td><b>导出长图</b></td><td>把正文一键排版成可晒的长图（模板/字体/颜色/自动九宫格切图）</td><td>极高频 ★★★</td></tr>
+    <tr><td><b>多端同步 + 本地备份</b></td><td>手机/平板/电脑/网页同步，自动本地备份防丢</td><td>极高频 ★★★</td></tr>
+    <tr><td><b>是否「喂 AI」</b></td><td>多款 App 把「官方承诺不喂 AI / 不拿你的稿训练」当卖点</td><td>反复出现，强隐私信号 ★★</td></tr>
+    <tr><td><b>码字数据 / 速度</b></td><td>今日码字、速度（字/分）、时长，并衍生游戏化</td><td>高频 ★★</td></tr>
+    <tr><td><b>辅助工作区</b></td><td>大纲/角色/设定/伏笔/时间线侧栏</td><td>网文向高频 ★★</td></tr>
+  </tbody>
+</table>
+<div class="quote">信号最强的两点：① 用户把「专注/防分心」当成写作页的核心功能（小黑屋几乎人人列）；② 大量 App 主动标注「不喂 AI」——说明写作者对「我的文字被拿去训练 AI」高度敏感。这直接利好你「用户自带 Key、隐私优先」的定位。</div>
+
+<h2 id="lib"><span class="num">③</span>写作页设计模式库（6 类）</h2>
+<p class="lead">把所读截图里的设计手法拆成 6 个可复用模式族。每条标注典型出处。</p>
+
+<h3>A · 专注 / 沉浸</h3>
+<div class="grid">
+  <div class="pat"><h4>小黑屋 / 强制写作</h4>设定字数或时间目标前，禁用退出与删除，逼自己往前写。<div class="ex">出处：百灵创作、WonderPen、锦鲤写作、好好码字</div></div>
+  <div class="pat"><h4>可收起三栏</h4>左目录 / 中编辑 / 右辅助，专注时一键隐藏两侧只剩正文。<div class="ex">出处：口袋写作、Obsidian、WonderPen</div></div>
+  <div class="pat"><h4>暗色 · 打字机居中</h4>深色护眼主题、正文居中、极简无干扰（很多写手干脆用 VSCode 写小说）。<div class="ex">出处：VSCode 写小说、Obsidian 暗色主题</div></div>
+  <div class="pat"><h4>流逝模式</h4>写完即「流逝」、降低「写得不好」的心理负担，鼓励自由表达。<div class="ex">出处：八度幻想「流逝模式」</div></div>
+</div>
+
+<h3>B · 码字数据 &amp; 游戏化</h3>
+<div class="grid">
+  <div class="pat"><h4>实时数据条</h4>今日码字 / 本次码字 / 当前速度（字/分）/ 码字时长 / 空闲时长 / <b>摸鱼次数</b>。<div class="ex">出处：百灵创作右侧数据面板</div></div>
+  <div class="pat"><h4>码字目标 + 进度</h4>默认章节目标（如 3000）、今日目标字数（如 6000），状态栏实时进度条。<div class="ex">出处：Obsidian WebNovel Assistant、好好码字</div></div>
+  <div class="pat"><h4>码字房间 / 上墙台</h4>限时冲刺房间：设目标字数、循环计时、可多人同屏一起冲。<div class="ex">出处：百灵创作「码字房间」</div></div>
+  <div class="pat"><h4>签到养成</h4>每日签到「养一条锦鲤」，把坚持写做成养成游戏。<div class="ex">出处：锦鲤写作</div></div>
+  <div class="pat"><h4>日历码字热力</h4>月历上每天码字量着色，连续天数一目了然。<div class="ex">出处：百灵创作数据总览（与你已有热力图同源）</div></div>
+</div>
+
+<h3>C · 辅助工作区（网文向）</h3>
+<div class="grid">
+  <div class="pat"><h4>大纲 / 角色 / 设定 / 伏笔 / 时间线</h4>左侧多 Tab 工作区，单独管理结构化创作资产。<div class="ex">出处：百灵创作、云上写作、Obsidian 插件</div></div>
+  <div class="pat"><h4>素材 / 灵感收集箱</h4>随手存灵感碎片，再「编织」成情节。<div class="ex">出处：故事织机、橙瓜码字、幕布</div></div>
+  <div class="pat"><h4>关系图谱 / 思维导图 / 故事地图</h4>把人物关系、世界观可视化。<div class="ex">出处：云上写作、幕布</div></div>
+  <div class="pat"><h4>敏感词检测 · 取名助手</h4>发布前查敏感词、一键生成人名。<div class="ex">出处：锦鲤写作</div></div>
+</div>
+
+<h3>D · 排版 &amp; 导出（分享驱动）</h3>
+<div class="grid">
+  <div class="pat"><h4>一键排版 · 导出长图</h4>正文套模板成图，可调字体/颜色/宽度，自动分割九宫格。<div class="ex">出处：番茄作家助手、Zine、稿定、纯纯写作（自动分九图）</div></div>
+  <div class="pat"><h4>选中文字改色 / 高亮</h4>在编辑器里圈选局部文字改颜色、做标记。<div class="ex">出处：百灵创作、锦鲤写作</div></div>
+</div>
+
+<h3>E · AI 辅助（需谨慎）</h3>
+<div class="grid">
+  <div class="pat"><h4>卡壳灵感生成</h4>按题材/人设/风格一键生成：小说灵感 + 章节大纲 + 一键成文，还有「拆文/单元设计/原著仿写」。<div class="ex">出处：量子探险</div></div>
+  <div class="pat"><h4>编辑器侧接 AI</h4>右侧常驻 AI 面板（直接接 Claude）做续写/分析。<div class="ex">出处：Obsidian WebNovel Assistant + Claude</div></div>
+  <div class="pat" style="border-left-color:var(--accent);"><h4>⚠️ 反向信号：不喂 AI 是卖点</h4>多款 App 强调「永久不喂 AI」。结论：AI 能力必须<strong>可选、透明、隐私优先</strong>，不能默认上传内容。<div class="ex">出处：好好码字、口袋写作</div></div>
+</div>
+
+<h3>F · 习惯 / 仪式 / 内省 <span class="badge">和你最契合</span></h3>
+<div class="grid">
+  <div class="pat" style="border-left-color:var(--gold);"><h4>提问引导内心写作</h4>不为发表，用提问把你引向内心；「仅你可见，诚实去写」；培养写作习惯。<div class="ex">出处：Koan</div></div>
+  <div class="pat" style="border-left-color:var(--gold);"><h4>动态欢迎语</h4>创作主页按时段变化的欢迎语 + 启示寄语 + 今日新增数据。<div class="ex">出处：Obsidian WebNovel Assistant 创作主页</div></div>
+  <div class="pat" style="border-left-color:var(--gold);"><h4>梦境 / 日常想象记录</h4>把灵感当日记记，每条配图，弱目标、低压力。<div class="ex">出处：八度幻想</div></div>
+  <div class="pat" style="border-left-color:var(--gold);"><h4>「如何进入状态」是刚需</h4>「写文怎么进入状态」类内容高赞——写作者把「进入心流的仪式」当真实痛点。<div class="ex">出处：多篇高赞经验帖</div></div>
+</div>
+
+<h2 id="apps"><span class="num">④</span>标杆 App 写作页速写</h2>
+<table>
+  <thead><tr><th>App</th><th>写作页亮点</th><th>定位</th></tr></thead>
+  <tbody>
+    <tr><td><b>百灵创作</b></td><td>右侧实时数据面板（含「摸鱼次数」）、码字房间限时冲刺、小黑屋强制写作、选中文字改色、工作区（大纲/情节/角色/伏笔）</td><td>数据+游戏化最强</td></tr>
+    <tr><td><b>口袋写作</b></td><td>顶部工具栏齐全（目录/同步/查找替换/主题/字体/布局/历史版本/字数统计），界面极简、纯单机、不喂 AI</td><td>简洁稳妥</td></tr>
+    <tr><td><b>Obsidian + WebNovel Assistant</b></td><td>创作主页全配仪表盘（2×2 网格）、动态欢迎语、写作目标进度、伏笔/时间线、右侧接 Claude、多端同步</td><td>可定制天花板</td></tr>
+    <tr><td><b>锦鲤写作</b></td><td>每日签到养锦鲤、小黑屋、导出长图调色、敏感词云检测、取名</td><td>养成感</td></tr>
+    <tr><td><b>纯纯写作</b></td><td>极简轻量、自动本地备份、导出长图自动切九图</td><td>轻量备份党</td></tr>
+    <tr><td><b>Koan</b></td><td>提问引导写内心、仅你可见、养写作习惯、自由书写</td><td>内省/日记向（与你最像）</td></tr>
+    <tr><td><b>量子探险</b></td><td>按题材/人设/风格一键生成灵感→大纲→成文，拆文/仿写</td><td>AI 灵感重度</td></tr>
+    <tr><td><b>石墨 / Pages</b></td><td>界面舒服丝滑、零学习成本、多端实时同步——「简单」本身就是卖点</td><td>极简通用</td></tr>
+  </tbody>
+</table>
+
+<h2 id="map"><span class="num">⑤</span>映射到「文字时光机」的建议</h2>
+<p class="lead">你的产品是<strong>个人随笔 + AI 分析</strong>，不是网文工厂。所以不能照搬，要按契合度过滤。</p>
+
+<div class="reco">
+  <div class="h">✅ 高契合 · 值得直接借鉴 <span class="p-fit pill">FIT</span></div>
+  <ul>
+    <li><b>专注/沉浸模式</b>：做一个轻量「专注写作」——隐藏导航、暗色/护眼、正文居中打字机。（小黑屋的「强锁」对随笔太硬，取其「沉浸」舍其「强制」。）</li>
+    <li><b>码字实时数据 + 游戏化</b>：你已有热力图，天然可延伸出「今日字数/连续天数/本次时长」。可把网文的「摸鱼次数/码字房间」温和化成「专注时长/今日心绪打卡」。</li>
+    <li><b>动态欢迎语 + 进入状态仪式</b>：写作页打开时按时段给一句话 + 今日提示，降低空白页焦虑——正好补你现在「纯 textarea 无引导」的短板。</li>
+    <li><b>提问引导（Koan 式）</b>：空白页时给一个「今天想记录什么」的轻提问/选题，呼应你的「写作画像」。</li>
+    <li><b>自动保存 + 本地备份</b>：这是写作页红线，几乎所有 App 都做了，你现在缺——应作为基础体验优先补。</li>
+    <li><b>导出长图分享</b>：把你独有的「分析/情感卡片」做成可晒长图，呼应你已有的 ljg-card 能力。</li>
+  </ul>
+</div>
+
+<div class="reco">
+  <div class="h">⚠️ 谨慎 · 不照搬 <span class="p-care pill">CARE</span></div>
+  <ul>
+    <li><b>网文工作区</b>（大纲/角色/设定/伏笔/敏感词/取名）：对个人随笔过重，会把产品拖向网文工具。除非你想拓展到「长文/小说」人群，否则跳过。</li>
+    <li><b>强制小黑屋</b>：随笔写作不该有「写不够不让走」的压迫感；做成可选的「专注模式」即可。</li>
+    <li><b>重排版导出引擎</b>：番茄/Zine 那种复杂排版模板系统投入大，先用「一张漂亮的心绪卡」覆盖 80% 分享需求。</li>
+  </ul>
+</div>
+
+<div class="reco">
+  <div class="h">🌟 差异化机会 · 别人没有的牌 <span class="p-no pill" style="background:#efe7f7;color:#6a3d9c;">EDGE</span></div>
+  <ul>
+    <li><b>写完即分析的闭环</b>：所有竞品的写作页都是「哑输入框」，分析都在别处。你独有「画像 + 情感时间线 + 深度分析」——把它前置到写作页，保存后立刻给一张「今日心绪卡 + 和过去的对照」，是没人做过的体验。</li>
+    <li><b>把「码字数据」升级成「心绪数据」</b>：竞品统计字数/速度，你可以统计情绪走向、关键词、与历史的呼应——同样的仪表盘骨架，灌入你独有的分析。</li>
+    <li><b>隐私即定位</b>：写手群体对「不喂 AI」高度敏感，而你正是「用户自带 Key、本地优先」。把这点显性化（写作页标注「你的文字只走你自己的 Key」）会直接戳中人群。</li>
+  </ul>
+</div>
+
+<h2 id="next"><span class="num">⑥</span>下一步</h2>
+<div class="card">
+  <p>这份研究是 PM 链路的「外部输入」。建议接回已部署的 PM skill 流程：</p>
+  <ul>
+    <li><code>problem-statement</code> → 用本报告的洞察，把写作页要解决的问题框准（如「空白页焦虑 / 哑输入框 / 写作-分析断裂」）</li>
+    <li><code>jobs-to-be-done</code> → 区分「网文写手 job」与「你的随笔用户 job」，避免被竞品带偏</li>
+    <li><code>opportunity-solution-tree</code> → 把第 ⑤ 节的 FIT / EDGE 长成机会树</li>
+    <li><code>prioritization-advisor</code> → 在「补红线（自动保存）/ 专注模式 / 写完即分析闭环」里排序</li>
+    <li><code>prd-development</code> → 出可落地 PRD（配设计稿，符合「设计稿优先」）</li>
+  </ul>
+  <p style="color:var(--sub);font-size:13px;">我的快速判断：<b>先补「自动保存 + 本地备份」红线</b>（低风险高价值），同时把<b>「写完即分析闭环」</b>作为这一轮的差异化亮点功能——这两件最值得先做。</p>
+</div>
+
+<footer>
+  写作页竞品研究 · 由 opencli 扒取小红书公开笔记后读图归纳生成 · 下载图片已焚毁<br>
+  仅供「文字时光机」产品迭代内部参考
+</footer>
+
+</div>
+</body>
+</html>
