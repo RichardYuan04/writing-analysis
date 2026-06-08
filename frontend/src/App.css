@@ -271,6 +271,62 @@
 }
 .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── 写作页：顶栏 + 自动保存态 ── */
+.write-top { display: flex; align-items: center; }
+.auto-state { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-hint); }
+.auto-state .auto-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-light); display: inline-block; }
+.auto-state.saving .auto-dot { background: var(--accent); animation: autopulse 1s infinite; }
+@keyframes autopulse { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
+
+/* ── 每日一问 ── */
+.daily-q {
+  position: relative;
+  background: linear-gradient(180deg, #FBF8F2, #F6F1E8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+.daily-x { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--text-hint); cursor: pointer; font-size: 14px; }
+.daily-text { font-family: var(--font-serif); font-size: 15px; color: var(--text-primary); padding-right: 18px; }
+.daily-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.daily-use {
+  border: 1px solid var(--accent-light); background: var(--bg-card); color: var(--accent);
+  font-size: 12px; padding: 5px 12px; border-radius: 20px; cursor: pointer;
+}
+.daily-use:hover { background: #FBF6EC; }
+.daily-sub { font-size: 11.5px; color: var(--text-hint); }
+
+/* ── 今日心绪卡 ── */
+.mood-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-top: 6px;
+}
+.mood-card.floating { box-shadow: 0 8px 24px rgba(139,111,71,.10); animation: moodFloat .5s cubic-bezier(.2,.8,.2,1); }
+@keyframes moodFloat { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+.mc-x { position: absolute; top: 12px; right: 14px; border: none; background: none; color: var(--text-hint); cursor: pointer; font-size: 15px; }
+.mc-cap { font-family: var(--font-serif); font-size: 12px; color: var(--accent); letter-spacing: .5px; text-align: center; margin-bottom: 12px; }
+.mc-tone { font-family: var(--font-serif); font-size: 18px; color: var(--text-primary); margin-bottom: 12px; }
+.mc-kw { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.mc-kw span { font-size: 12.5px; color: var(--accent); background: #F3E6CC; border-radius: 20px; padding: 3px 12px; }
+.mc-divider { height: 1px; background: var(--border); margin: 4px 0 14px; }
+.mc-reply { display: flex; gap: 10px; font-family: var(--font-serif); font-size: 14.5px; color: var(--text-secondary); min-height: 24px; }
+.mc-reply.pending { color: var(--text-hint); font-style: italic; }
+.mc-ic { flex-shrink: 0; }
+.mc-faint { color: var(--text-hint); }
+.mc-typing::after { content: '…'; animation: mcDots 1.2s steps(4) infinite; }
+@keyframes mcDots { 0% { content: '' } 25% { content: '.' } 50% { content: '..' } 75% { content: '...' } }
+.mc-privacy { font-size: 11px; color: var(--text-hint); margin-top: 10px; }
+.mc-acts { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 16px; }
+.mc-acts button { font-size: 13px; padding: 7px 18px; border-radius: var(--radius-md); cursor: pointer; }
+.mc-soft { border: 1px solid var(--accent-light); background: #FBF6EC; color: var(--accent); font-weight: 600; }
+.mc-ghost { border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); }
+.mc-ghost:hover { border-color: var(--accent-light); color: var(--accent); }
+.mc-saved { font-size: 12px; color: var(--accent); margin-right: 4px; }
+
 /* ── 详情页 ── */
 .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .back-btn {

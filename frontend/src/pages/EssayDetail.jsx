@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getEssay, deleteEssay, updateEssay } from '../api'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import WordCloud from '../components/WordCloud'
+import MoodCard from '../components/MoodCard'
 
 export default function EssayDetail({ id, onBack }) {
   const [essay, setEssay] = useState(null)
@@ -116,6 +117,10 @@ export default function EssayDetail({ id, onBack }) {
             <span>情感分: {essay.sentiment?.toFixed(2)}</span>
           </div>
           <div className="detail-content">{essay.content}</div>
+
+          {essay.mood_card && (
+            <MoodCard mood={essay.mood_card} variant="persisted" />
+          )}
 
           <div className="detail-analysis">
             <section className="section">

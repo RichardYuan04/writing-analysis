@@ -66,6 +66,7 @@ class Essay(Base):
     sentiment_neutral = Column(Float)
     sentiment_negative = Column(Float)
     emotion_detail = Column(Text)   # JSON: {joy, gratitude, love, neutral, surprise, anger, ...}
+    mood_card = Column(Text)        # JSON: {tone, tone_emoji, keywords[], ai_reply, ai_reply_status, generated_at}
     created_at = Column(DateTime, default=datetime.now)
 
 Base.metadata.create_all(engine)
@@ -117,6 +118,7 @@ def migrate_db():
             ("sentiment_neutral",  "FLOAT"),
             ("sentiment_negative", "FLOAT"),
             ("emotion_detail",     "TEXT"),
+            ("mood_card",          "TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE essays ADD COLUMN {col} {typ}"))
@@ -229,6 +231,43 @@ def analyze_text(content: str):
     }
 
 
+# 心绪卡：主导情绪 → 一句"底色"文案 + emoji（陪伴式，不评判）
+EMOTION_TONE = {
+    "joy":         ("心里是亮的",         "☀️"),
+    "gratitude":   ("有一份感激沉在底下",  "🍃"),
+    "love":        ("有柔软的东西在涌动",  "🌸"),
+    "neutral":     ("平静，但留着回响",    "🍃"),
+    "surprise":    ("有些意外轻轻撞了一下", "✨"),
+    "anger":       ("有一股没散的火气",    "🔥"),
+    "contempt":    ("带着一点疏离",        "🌫️"),
+    "disgust":     ("有些抵触和不适",      "🌫️"),
+    "fear":        ("藏着一点不安",        "🌙"),
+    "frustration": ("卡着一团拧巴",        "🌧️"),
+    "sadness":     ("沉沉的，有些低落",    "🌧️"),
+}
+
+
+def compute_mood_card(content: str, em: dict = None, analysis: dict = None) -> dict:
+    """本地秒出心绪卡的可见部分（情感基调 + 关键词）。AI 那句回应由 mood-reply 接口异步补。"""
+    em = em if em is not None else (compute_emotion_breakdown(content) or {})
+    analysis = analysis if analysis is not None else analyze_text(content)
+    detail = em.get("detail") or {}
+    if detail:
+        dominant = max(detail, key=detail.get)
+        tone, emoji = EMOTION_TONE.get(dominant, ("记录下来了", "🍃"))
+    else:
+        tone, emoji = ("记录下来了", "🍃")
+    keywords = [w["word"] for w in analysis.get("top_words", [])[:3]]
+    return {
+        "tone": tone,
+        "tone_emoji": emoji,
+        "keywords": keywords,
+        "ai_reply": None,
+        "ai_reply_status": "pending",   # pending | ok | skipped | error
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+
+
 class EssayCreate(BaseModel):
     title: str
     content: str
@@ -239,6 +278,7 @@ class EssayCreate(BaseModel):
 def create_essay(data: EssayCreate):
     analysis = analyze_text(data.content)
     em = compute_emotion_breakdown(data.content) or {}
+    mood = compute_mood_card(data.content, em=em, analysis=analysis)
     session = Session()
     essay = Essay(
         title=data.title,
@@ -250,11 +290,12 @@ def create_essay(data: EssayCreate):
         sentiment_neutral=em.get("neutral"),
         sentiment_negative=em.get("negative"),
         emotion_detail=json.dumps(em["detail"]) if em.get("detail") else None,
+        mood_card=json.dumps(mood, ensure_ascii=False),
     )
     session.add(essay)
     session.commit()
     session.refresh(essay)
-    result = {"id": essay.id, **data.dict(), **analysis}
+    result = {"id": essay.id, **data.dict(), **analysis, "mood_card": mood}
     session.close()
     return result
 
@@ -357,6 +398,7 @@ def get_essay(essay_id: int):
         "date": essay.date,
         "sentiment": essay.sentiment_score,
         "emotion_detail": json.loads(essay.emotion_detail) if essay.emotion_detail else None,
+        "mood_card": json.loads(essay.mood_card) if essay.mood_card else None,
         **analysis,
     }
     session.close()
@@ -378,6 +420,7 @@ def update_essay(essay_id: int, data: EssayUpdate):
         raise HTTPException(status_code=404, detail="Not found")
     analysis = analyze_text(data.content)
     em = compute_emotion_breakdown(data.content) or {}
+    mood = compute_mood_card(data.content, em=em, analysis=analysis)  # 最新一张覆盖
     essay.title = data.title
     essay.content = data.content
     essay.date = data.date
@@ -387,10 +430,61 @@ def update_essay(essay_id: int, data: EssayUpdate):
     essay.sentiment_neutral  = em.get("neutral")
     essay.sentiment_negative = em.get("negative")
     essay.emotion_detail     = json.dumps(em["detail"]) if em.get("detail") else None
+    essay.mood_card          = json.dumps(mood, ensure_ascii=False)
     session.commit()
-    result = {"id": essay.id, **data.dict(), **analysis}
+    result = {"id": essay.id, **data.dict(), **analysis, "mood_card": mood}
     session.close()
     return result
+
+
+@app.post("/essays/{essay_id}/mood-reply")
+def essay_mood_reply(essay_id: int):
+    """异步生成今日心绪卡里那句『陪伴式回应』，写回 mood_card.ai_reply。"""
+    session = Session()
+    essay = session.query(Essay).filter(Essay.id == essay_id).first()
+    if not essay:
+        session.close()
+        raise HTTPException(status_code=404, detail="随笔不存在")
+    content = (essay.content or "").strip()
+    mood = json.loads(essay.mood_card) if essay.mood_card else compute_mood_card(content)
+
+    # 太短的随笔跳过 AI，避免无意义调用
+    if len(content) < 30:
+        mood["ai_reply"] = None
+        mood["ai_reply_status"] = "skipped"
+        essay.mood_card = json.dumps(mood, ensure_ascii=False)
+        session.commit()
+        session.close()
+        return mood
+
+    prompt = f"""你在读一个人刚写完的随笔。请用一句话（40字以内）温柔地回应 TA，像一个懂 TA 的老朋友。
+要求：
+- 不评判、不总结、不喊鼓励口号
+- 可以点出文字里反复出现的、或微妙没说透的东西
+- 第二人称「你」，口语，不要引号
+只返回这一句话本身。
+
+随笔：
+{content[:1500]}"""
+
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=120,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        reply = message.content[0].text.strip().strip('「」"' "'").strip()
+        mood["ai_reply"] = reply
+        mood["ai_reply_status"] = "ok"
+    except Exception as e:
+        print(f"[mood-reply] {essay_id} error: {e}")
+        mood["ai_reply"] = None
+        mood["ai_reply_status"] = "error"
+
+    essay.mood_card = json.dumps(mood, ensure_ascii=False)
+    session.commit()
+    session.close()
+    return mood
 
 
 @app.delete("/essays/{essay_id}")
