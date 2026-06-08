@@ -270,6 +270,7 @@
   font-weight: 600;
 }
 .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.saved-flag { font-size: 13px; font-weight: 600; color: var(--accent); }
 
 /* ── 写作页：顶栏 + 自动保存态 ── */
 .write-top { display: flex; align-items: center; }

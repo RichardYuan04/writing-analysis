@@ -31,6 +31,8 @@ export default function Write({ onSaved, prefill, onBack }) {
   const [mood, setMood] = useState(null)               // 保存后浮出的心绪卡
 
   const contentRef = useRef(null)
+  const moodRef = useRef(null)
+  const savingRef = useRef(false)   // 同步防重入，挡住快速连点导致的重复创建
   const [greeting] = useState(daily)
   const [prompt] = useState(() => {
     const pool = PROMPTS[daily().slot]
@@ -78,7 +80,9 @@ export default function Write({ onSaved, prefill, onBack }) {
   }
 
   const handleSave = async () => {
+    if (savingRef.current || mood) return   // 防重入 + 已保存(卡片已出)不再创建
     if (!title.trim() || !content.trim()) { setError('标题和内容不能为空'); return }
+    savingRef.current = true
     setSaving(true); setError('')
     try {
       const res = await createEssay({ title, content, date })
@@ -86,6 +90,8 @@ export default function Write({ onSaved, prefill, onBack }) {
       // 后端旧版/未返回心绪卡时，退回原行为（保存后离开），不渲染空卡
       if (!res.data.mood_card || !res.data.mood_card.tone) { onSaved(); return }
       setMood({ id: res.data.id, ...res.data.mood_card })
+      // 滚动到卡片，让"保存成功"可见
+      setTimeout(() => moodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
       // 异步补那句 AI 回应
       moodReply(res.data.id)
         .then(r => setMood(m => (m && m.id === res.data.id ? { ...m, ...r.data } : m)))
@@ -94,6 +100,7 @@ export default function Write({ onSaved, prefill, onBack }) {
       setError('保存失败，请检查后端是否启动')
     } finally {
       setSaving(false)
+      savingRef.current = false
     }
   }
 
@@ -144,17 +151,23 @@ export default function Write({ onSaved, prefill, onBack }) {
       <div className="write-footer">
         <span className="word-count">{content.replace(/\s/g, '').length} 字</span>
         {error && <span className="error">{error}</span>}
-        <button className="save-btn" onClick={handleSave} disabled={saving}>
-          {saving ? '保存中…' : '保存'}
-        </button>
+        {mood ? (
+          <span className="saved-flag">已保存 ✓</span>
+        ) : (
+          <button className="save-btn" onClick={handleSave} disabled={saving}>
+            {saving ? '保存中…' : '保存'}
+          </button>
+        )}
       </div>
 
       {mood && (
-        <MoodCard
-          mood={mood}
-          onDismiss={() => { setMood(null); onSaved() }}
-          floating
-        />
+        <div ref={moodRef}>
+          <MoodCard
+            mood={mood}
+            onDismiss={() => { setMood(null); onSaved() }}
+            floating
+          />
+        </div>
       )}
     </div>
   )
