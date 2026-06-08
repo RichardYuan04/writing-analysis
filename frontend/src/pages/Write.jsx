@@ -83,6 +83,8 @@ export default function Write({ onSaved, prefill, onBack }) {
     try {
       const res = await createEssay({ title, content, date })
       localStorage.removeItem(DRAFT_KEY)
+      // 后端旧版/未返回心绪卡时，退回原行为（保存后离开），不渲染空卡
+      if (!res.data.mood_card || !res.data.mood_card.tone) { onSaved(); return }
       setMood({ id: res.data.id, ...res.data.mood_card })
       // 异步补那句 AI 回应
       moodReply(res.data.id)
