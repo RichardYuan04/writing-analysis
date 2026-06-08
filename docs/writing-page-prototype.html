@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>写作页原型 · 自动保存 · 每日一问 · 今日心绪卡</title>
+<style>
+  :root{
+    --bg:#F7F4EF; --bg-card:#FFFFFF; --text-primary:#2C2C2C; --text-secondary:#8A7F74;
+    --text-hint:#B5A898; --accent:#8B6F47; --accent-light:#C9B99A; --border:#E8E0D5;
+    --pos:#8B6F47; --neg:#7A8FA6; --neu:#C9B99A;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+    --serif:'Noto Serif SC','Songti SC',Georgia,serif;
+    --sans:'PingFang SC',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--text-primary);
+    -webkit-font-smoothing:antialiased;line-height:1.7;}
+  .app{max-width:760px;margin:0 auto;padding:0 18px 80px;}
+  /* 顶栏 */
+  nav{display:flex;align-items:center;gap:16px;padding:16px 2px;border-bottom:1px solid var(--border);margin-bottom:8px;}
+  .logo{font-family:var(--serif);font-weight:700;color:var(--accent);font-size:17px;}
+  .seg{margin-left:auto;display:flex;gap:4px;background:#F0EBE3;border-radius:var(--radius-md);padding:3px;}
+  .seg button{border:none;background:none;font-family:var(--sans);font-size:12.5px;color:var(--text-secondary);
+    padding:5px 12px;border-radius:6px;cursor:pointer;}
+  .seg button.active{background:var(--bg-card);color:var(--accent);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+  .hint-note{font-size:11.5px;color:var(--text-hint);text-align:center;margin:6px 0 14px;}
+  .hint-note code{background:#F0EBE3;padding:1px 6px;border-radius:4px;}
+
+  /* 写作页 */
+  .write-top{display:flex;align-items:center;margin:14px 2px 10px;}
+  .back{border:none;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--sans);}
+  .save-state{margin-left:auto;font-size:12px;color:var(--text-hint);display:flex;align-items:center;gap:6px;}
+  .save-state .dot{width:6px;height:6px;border-radius:50%;background:var(--neu);display:inline-block;}
+  .save-state.saving .dot{background:var(--accent);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  /* 每日一问 */
+  .daily{background:linear-gradient(180deg,#FBF8F2,#F6F1E8);border:1px solid var(--border);
+    border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:14px;position:relative;
+    transition:opacity .3s,transform .3s,max-height .3s;overflow:hidden;}
+  .daily.hidden{opacity:0;transform:translateY(-6px);max-height:0;padding:0;margin-bottom:0;border-color:transparent;pointer-events:none;}
+  .daily .q{font-family:var(--serif);font-size:15px;color:var(--text-primary);}
+  .daily .row{display:flex;align-items:center;gap:10px;margin-top:10px;}
+  .daily .use{border:1px solid var(--accent-light);background:var(--bg-card);color:var(--accent);
+    font-size:12px;padding:5px 12px;border-radius:20px;cursor:pointer;font-family:var(--sans);}
+  .daily .use:hover{background:#FBF6EC;}
+  .daily .x{position:absolute;top:10px;right:12px;border:none;background:none;color:var(--text-hint);cursor:pointer;font-size:14px;}
+
+  /* 编辑区 */
+  .head-row{display:flex;gap:12px;align-items:center;margin-bottom:10px;}
+  .title-in{flex:1;border:none;border-bottom:1px solid var(--border);background:none;font-family:var(--serif);
+    font-size:21px;color:var(--text-primary);padding:8px 2px;outline:none;}
+  .title-in::placeholder{color:var(--text-hint);}
+  .date-in{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);
+    color:var(--text-secondary);font-size:12.5px;padding:6px 8px;font-family:var(--sans);}
+  .content-in{width:100%;min-height:260px;border:none;background:none;resize:vertical;
+    font-family:var(--serif);font-size:16px;line-height:2;color:var(--text-primary);outline:none;padding:6px 2px;}
+  .content-in::placeholder{color:var(--text-hint);}
+  .foot{display:flex;align-items:center;margin-top:12px;}
+  .wc{font-size:12px;color:var(--text-hint);}
+  .save-btn{margin-left:auto;border:none;background:var(--accent);color:#fff;font-family:var(--sans);
+    font-size:14px;font-weight:600;padding:9px 26px;border-radius:var(--radius-md);cursor:pointer;}
+  .save-btn:hover{background:#7A6240;}
+  .save-btn:disabled{background:var(--accent-light);cursor:not-allowed;}
+
+  /* 心绪卡 */
+  .mood-wrap{margin-top:18px;}
+  .mood{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);
+    padding:18px 20px;position:relative;box-shadow:0 8px 24px rgba(139,111,71,.10);
+    animation:floatUp .5s cubic-bezier(.2,.8,.2,1);}
+  @keyframes floatUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+  .mood .cap{font-family:var(--serif);font-size:12px;color:var(--accent);letter-spacing:.5px;
+    text-align:center;margin-bottom:12px;position:relative;}
+  .mood .cap::before,.mood .cap::after{content:"";position:absolute;top:50%;width:42px;height:1px;background:var(--border);}
+  .mood .cap::before{left:50%;margin-left:-90px;} .mood .cap::after{right:50%;margin-right:-90px;}
+  .mood .x{position:absolute;top:12px;right:14px;border:none;background:none;color:var(--text-hint);cursor:pointer;font-size:15px;}
+  .tone{font-family:var(--serif);font-size:18px;color:var(--text-primary);margin-bottom:12px;}
+  .kw{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .kw span{font-size:12.5px;color:var(--accent);background:#F3E6CC;border-radius:20px;padding:3px 12px;}
+  .divider{height:1px;background:var(--border);margin:4px 0 14px;}
+  .reply{display:flex;gap:10px;font-size:14.5px;color:var(--text-secondary);font-family:var(--serif);min-height:24px;}
+  .reply .ic{flex-shrink:0;}
+  .reply.pending{color:var(--text-hint);font-style:italic;}
+  .reply .typing::after{content:"…";animation:dots 1.2s steps(4) infinite;}
+  @keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+  .privacy{font-size:11px;color:var(--text-hint);margin-top:10px;display:flex;align-items:center;gap:5px;}
+  .mood-acts{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
+  .mood-acts button{font-family:var(--sans);font-size:13px;padding:7px 18px;border-radius:var(--radius-md);cursor:pointer;}
+  .btn-ghost{border:1px solid var(--border);background:var(--bg-card);color:var(--text-secondary);}
+  .btn-ghost:hover{border-color:var(--accent-light);color:var(--accent);}
+  .btn-soft{border:1px solid var(--accent-light);background:#FBF6EC;color:var(--accent);font-weight:600;}
+
+  /* 详情页 */
+  .detail .d-title{font-family:var(--serif);font-size:24px;margin:18px 2px 2px;}
+  .detail .d-date{font-size:12.5px;color:var(--text-hint);margin:0 2px 14px;}
+  .detail .d-body{font-family:var(--serif);font-size:16px;line-height:2;color:var(--text-primary);white-space:pre-wrap;
+    border-bottom:1px solid var(--border);padding-bottom:20px;}
+  .empty{color:var(--text-hint);font-size:13.5px;text-align:center;padding:40px 0;}
+
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:#2C2C2C;color:#fff;font-size:13px;padding:10px 18px;border-radius:20px;transition:.3s;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .view{display:none;} .view.active{display:block;}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav>
+    <span class="logo">✍️ 文字时光机</span>
+    <div class="seg">
+      <button id="tab-write" class="active" onclick="showView('write')">写作页</button>
+      <button id="tab-detail" onclick="showView('detail')">详情页（持久化）</button>
+    </div>
+  </nav>
+  <div class="hint-note">交互原型 · 写几句 → 点<code>保存</code>看心绪卡原地浮出 → AI 回应异步补上 → 切「详情页」看持久化</div>
+
+  <!-- ===== 写作页 ===== -->
+  <section id="view-write" class="view active">
+    <div class="write-top">
+      <button class="back">← 返回仓库</button>
+      <div class="save-state" id="saveState"><span class="dot"></span><span id="saveText">尚未开始</span></div>
+    </div>
+
+    <div class="daily" id="daily">
+      <button class="x" onclick="document.getElementById('daily').classList.add('hidden')">✕</button>
+      <div class="q" id="dailyQ">🌙 深夜了。今天有什么一直放不下的事？</div>
+      <div class="row">
+        <button class="use" onclick="usePrompt()">用这个开头</button>
+        <span style="font-size:11.5px;color:var(--text-hint)">按时段 + 你的写作画像生成</span>
+      </div>
+    </div>
+
+    <div class="head-row">
+      <input class="title-in" id="title" placeholder="标题…">
+      <input class="date-in" id="date" type="date">
+    </div>
+    <textarea class="content-in" id="content" placeholder="开始写作…"></textarea>
+    <div class="foot">
+      <span class="wc"><b id="wc">0</b> 字</span>
+      <button class="save-btn" id="saveBtn" onclick="onSave()" disabled>保存</button>
+    </div>
+
+    <div class="mood-wrap" id="moodWrap"></div>
+  </section>
+
+  <!-- ===== 详情页 ===== -->
+  <section id="view-detail" class="view detail">
+    <button class="back" onclick="showView('write')">← 返回总览</button>
+    <div id="detailBody"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- 每日一问（按真实时段）----------
+(function(){
+  const h=new Date().getHours();
+  let q;
+  if(h>=5&&h<11) q="☀️ 早。醒来后脑子里第一个念头是什么？";
+  else if(h>=11&&h<18) q="🍵 午后了。此刻有什么一直没说出口的事？";
+  else q="🌙 深夜了。今天有什么一直放不下的事？";
+  document.getElementById('dailyQ').textContent=q;
+  window.__dailyPrompt=q.replace(/^[^ ]+ /,'');
+})();
+function usePrompt(){
+  const c=document.getElementById('content');
+  if(!c.value.trim()){ c.value=window.__dailyPrompt+"\n\n"; }
+  c.focus(); c.setSelectionRange(c.value.length,c.value.length);
+  document.getElementById('daily').classList.add('hidden');
+  onInput();
+}
+
+// ---------- 日期默认今天 ----------
+document.getElementById('date').value=new Date().toISOString().split('T')[0];
+
+// ---------- 字数 + 自动保存态 ----------
+const content=document.getElementById('content'), title=document.getElementById('title');
+let saveTimer=null;
+function onInput(){
+  const n=content.value.replace(/\s/g,'').length;
+  document.getElementById('wc').textContent=n;
+  document.getElementById('saveBtn').disabled=!(title.value.trim()&&content.value.trim());
+  // 模拟无感自动保存
+  const st=document.getElementById('saveState'), t=document.getElementById('saveText');
+  st.classList.add('saving'); t.textContent='保存中…';
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    st.classList.remove('saving');
+    const now=new Date().toTimeString().slice(0,5);
+    t.textContent='已自动保存 · '+now;
+  },800);
+}
+content.addEventListener('input',onInput);
+title.addEventListener('input',onInput);
+
+// ---------- 本地"分析"（原型用轻量启发式，真实走 compute_emotion_breakdown）----------
+function analyze(text){
+  const negs=['累','疲','倦','焦虑','烦','怕','难','痛','哭','孤','失','慌','压','撑'];
+  const poss=['终于','开心','好','爱','喜欢','暖','松','轻','希望','谢','幸','笑','值得','释然'];
+  let s=0; negs.forEach(w=>{if(text.includes(w))s--}); poss.forEach(w=>{if(text.includes(w))s++});
+  let tone,emoji;
+  if(s<0){tone='疲惫里有一点松动';emoji='🌙';}
+  else if(s>0){tone='今天的底色，有暖意';emoji='☀️';}
+  else {tone='平静，但心里有回响';emoji='🍃';}
+  // 关键词：抽 2-4 字的中文词块，取较长/较频的几个
+  const toks=(text.match(/[一-龥]{2,4}/g)||[]);
+  const freq={}; toks.forEach(t=>freq[t]=(freq[t]||0)+1);
+  const kws=[...new Set(toks)].sort((a,b)=>(freq[b]-freq[a])||(b.length-a.length)).slice(0,3);
+  if(kws.length===0) kws.push('此刻');
+  // 一句 AI 回应（模板，真实走自带 Key 异步）
+  const kw=kws[0];
+  const tpl=[
+    `你反复写到「${kw}」——也许它比你以为的更重要。`,
+    `读到「${kw}」这里，停了一下。你愿意明天再多写它一点吗？`,
+    `「${kw}」之后，语气松了下来——有些事正在你心里落地。`,
+    `这段里藏着「${kw}」，像是说给以后的自己听的。`
+  ];
+  return {tone,emoji,kws,reply:tpl[Math.floor(Math.random()*tpl.length)]};
+}
+
+let lastCard=null;
+// ---------- 保存：原地浮出心绪卡 ----------
+function onSave(){
+  const text=content.value.trim(); if(!text||!title.value.trim())return;
+  const r=analyze(text);
+  lastCard={title:title.value.trim(),date:document.getElementById('date').value,body:content.value,...r};
+  const wrap=document.getElementById('moodWrap');
+  wrap.innerHTML=`
+    <div class="mood" id="moodCard">
+      <button class="x" onclick="dismissCard()">✕</button>
+      <div class="cap">今日心绪</div>
+      <div class="tone">${r.emoji} 底色：${r.tone}</div>
+      <div class="kw">${r.kws.map(k=>`<span>${k}</span>`).join('')}</div>
+      <div class="divider"></div>
+      <div class="reply pending" id="reply"><span class="ic">💬</span><span class="typing">正在读你的文字</span></div>
+      <div class="privacy">ⓘ 这句只走你自己的 Key · 你的文字不被用于训练 AI</div>
+      <div class="mood-acts">
+        <button class="btn-soft" onclick="saveAsCard()">存为卡片</button>
+        <button class="btn-ghost" onclick="dismissCard()">知道了</button>
+      </div>
+    </div>`;
+  document.getElementById('moodCard').scrollIntoView({behavior:'smooth',block:'center'});
+  // 模拟 AI 异步回应
+  setTimeout(()=>{
+    const rep=document.getElementById('reply');
+    if(rep){rep.classList.remove('pending');rep.innerHTML=`<span class="ic">💬</span><span>"${r.reply}"</span>`;}
+  },1700);
+  renderDetail();
+}
+function dismissCard(){document.getElementById('moodWrap').innerHTML='';}
+function saveAsCard(){showToast('已存为卡片（原型示意 · 真实接 ljg-card 导出图）');}
+
+// ---------- 详情页：心绪卡常驻 ----------
+function renderDetail(){
+  const d=document.getElementById('detailBody');
+  if(!lastCard){d.innerHTML='<div class="empty">还没有保存过的文章。先去写作页写一篇、点保存。</div>';return;}
+  d.innerHTML=`
+    <div class="d-title">${lastCard.title}</div>
+    <div class="d-date">${lastCard.date}</div>
+    <div class="d-body">${lastCard.body.replace(/</g,'&lt;')}</div>
+    <div class="mood" style="margin-top:18px;animation:none;">
+      <div class="cap">当时的心绪</div>
+      <div class="tone">${lastCard.emoji} ${lastCard.tone}</div>
+      <div class="kw">${lastCard.kws.map(k=>`<span>${k}</span>`).join('')}</div>
+      <div class="divider"></div>
+      <div class="reply"><span class="ic">💬</span><span>"${lastCard.reply}"</span></div>
+      <div class="privacy">ⓘ 持久化 · 最新一张覆盖 · 每次重新保存即更新</div>
+      <div class="mood-acts"><button class="btn-soft" onclick="saveAsCard()">存为卡片</button></div>
+    </div>`;
+}
+renderDetail();
+
+// ---------- 视图切换 ----------
+function showView(v){
+  document.getElementById('view-write').classList.toggle('active',v==='write');
+  document.getElementById('view-detail').classList.toggle('active',v==='detail');
+  document.getElementById('tab-write').classList.toggle('active',v==='write');
+  document.getElementById('tab-detail').classList.toggle('active',v==='detail');
+  if(v==='detail')renderDetail();
+}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+</script>
+</body>
+</html>
