@@ -1,20 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
 import { createEssay, moodReply } from '../api'
 import MoodCard from '../components/MoodCard'
+import QUOTES from '../data/quotes'
 
 const DRAFT_KEY = 'wt_write_draft'
 
-// 每日一问：按时段给问候 + 轻选题池
-const PROMPTS = {
-  morning: ['醒来后脑子里第一个念头是什么？', '昨晚的梦还记得吗？', '今天最想为自己做的一件小事？'],
-  afternoon: ['此刻有什么一直没说出口的事？', '今天到现在，哪一刻让你停了一下？', '手边这件事，让你有什么感觉？'],
-  night: ['今天有什么一直放不下的事？', '这一天，有没有一个瞬间想留下来？', '睡前，想对自己说一句什么？'],
-}
+// 按时段给问候
 function daily() {
   const h = new Date().getHours()
-  if (h >= 5 && h < 11) return { emoji: '☀️', hello: '早。', slot: 'morning' }
-  if (h >= 11 && h < 18) return { emoji: '🍵', hello: '午后了。', slot: 'afternoon' }
-  return { emoji: '🌙', hello: '夜深了。', slot: 'night' }
+  if (h >= 5 && h < 11) return { emoji: '☀️', hello: '早。' }
+  if (h >= 11 && h < 18) return { emoji: '🍵', hello: '午后了。' }
+  return { emoji: '🌙', hello: '夜深了。' }
+}
+
+// 随机取一句金句（尽量不和上一句重复）
+function pickQuote(prev) {
+  if (QUOTES.length <= 1) return QUOTES[0]
+  let q
+  do { q = QUOTES[Math.floor(Math.random() * QUOTES.length)] } while (q === prev)
+  return q
 }
 
 export default function Write({ onSaved, prefill, onBack }) {
@@ -34,10 +38,7 @@ export default function Write({ onSaved, prefill, onBack }) {
   const moodRef = useRef(null)
   const savingRef = useRef(false)   // 同步防重入，挡住快速连点导致的重复创建
   const [greeting] = useState(daily)
-  const [prompt] = useState(() => {
-    const pool = PROMPTS[daily().slot]
-    return pool[Math.floor(Math.random() * pool.length)]
-  })
+  const [quote, setQuote] = useState(() => pickQuote(null))
 
   // 初始化：prefill（来自仓库）优先；否则尝试恢复本地草稿
   useEffect(() => {
@@ -70,14 +71,7 @@ export default function Write({ onSaved, prefill, onBack }) {
     return () => clearTimeout(t)
   }, [title, content, date, mood])
 
-  const usePrompt = () => {
-    if (!content.trim()) setContent(prompt + '\n\n')
-    setDailyShown(false)
-    setTimeout(() => {
-      const el = contentRef.current
-      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length) }
-    }, 0)
-  }
+  const nextQuote = () => setQuote(q => pickQuote(q))
 
   const handleSave = async () => {
     if (savingRef.current || mood) return   // 防重入 + 已保存(卡片已出)不再创建
@@ -119,10 +113,13 @@ export default function Write({ onSaved, prefill, onBack }) {
       {dailyShown && !mood && (
         <div className="daily-q">
           <button className="daily-x" onClick={() => setDailyShown(false)}>✕</button>
-          <div className="daily-text">{greeting.emoji} {greeting.hello}{prompt}</div>
+          <div className="daily-hello">{greeting.emoji} {greeting.hello}</div>
+          <blockquote className="daily-quote">{quote.t}</blockquote>
           <div className="daily-row">
-            <button className="daily-use" onClick={usePrompt}>用这个开头</button>
-            <span className="daily-sub">按时段 · 结合你的写作习惯</span>
+            <span className="daily-cite">
+              — {quote.a}{quote.s ? `《${quote.s}》` : ''}
+            </span>
+            <button className="daily-next" onClick={nextQuote}>换一句</button>
           </div>
         </div>
       )}

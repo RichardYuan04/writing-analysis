@@ -47,7 +47,7 @@ export default function MoodCard({ mood, onDismiss, floating = false, variant = 
       </div>
 
       <div className="mc-privacy">
-        ⓘ {persisted ? '持久化 · 最新一张覆盖' : '这句只走你自己的 Key · 你的文字不被用于训练'}
+        ⓘ {persisted ? '持久化 · 最新一张覆盖' : '你的文字不会被用于训练模型'}
       </div>
 
       <div className="mc-acts">
