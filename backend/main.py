@@ -487,6 +487,49 @@ def essay_mood_reply(essay_id: int):
     return mood
 
 
+# ── 写作浮层工具箱 ──
+# 无状态文本变换：选中一段文字 → AI 辅助。当前先打通「缩减」一条。
+# style_profile 为可选；缺省时走降级分支（仅要求贴合原文与上下文，不强加风格）。
+class AssistRequest(BaseModel):
+    text: str
+    context: str = ""
+    style_profile: str = ""
+
+
+def _assist_system(style_profile: str) -> str:
+    sp = (style_profile or "").strip()
+    if sp:
+        style_line = (f"该作者的写作风格为：{sp}。"
+                      "所有建议必须与该风格保持一致，不要改变作者的声音和语气。")
+    else:
+        style_line = "保持与原文及上下文一致的语气和风格，不要改变作者的声音。"
+    return f"你是写作助手。{style_line}\n直接输出结果，不要解释、不要加前缀、不要加引号。"
+
+
+@app.post("/assist/reduce")
+def assist_reduce(data: AssistRequest):
+    text = (data.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="选中文字不能为空")
+    user = (
+        "请将以下文字压缩至原来约一半的长度。\n"
+        "要求：保留核心意思和情感，删去冗余表达，保持作者的句式风格，直接输出压缩后的文字。\n\n"
+        f"原文：{text}"
+    )
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            system=_assist_system(data.style_profile),
+            messages=[{"role": "user", "content": user}],
+        )
+        result = message.content[0].text.strip().strip('「」""\'').strip()
+        return {"result": result}
+    except Exception as e:
+        print(f"[assist/reduce] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+
 @app.delete("/essays/{essay_id}")
 def delete_essay(essay_id: int):
     session = Session()

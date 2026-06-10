@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createEssay, moodReply } from '../api'
 import MoodCard from '../components/MoodCard'
+import AssistPanel from '../components/AssistPanel'
 import QUOTES from '../data/quotes'
 
 const DRAFT_KEY = 'wt_write_draft'
@@ -39,6 +40,9 @@ export default function Write({ onSaved, prefill, onBack }) {
   const savingRef = useRef(false)   // 同步防重入，挡住快速连点导致的重复创建
   const [greeting] = useState(daily)
   const [quote, setQuote] = useState(() => pickQuote(null))
+  const [sel, setSel] = useState(null)            // 当前选区 {start,end,text}
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
+  const [undoStack, setUndoStack] = useState([])  // 替换前整篇正文快照栈
 
   // 初始化：prefill（来自仓库）优先；否则尝试恢复本地草稿
   useEffect(() => {
@@ -73,6 +77,35 @@ export default function Write({ onSaved, prefill, onBack }) {
 
   const nextQuote = () => setQuote(q => pickQuote(q))
 
+  // 正文选区变化 → 同步给右侧面板（≥4 字才算有效选中）
+  const onContentSelect = (e) => {
+    const el = e.target
+    const text = el.value.slice(el.selectionStart, el.selectionEnd)
+    if (text.trim().length >= 4) {
+      setSel({ start: el.selectionStart, end: el.selectionEnd, text })
+    } else {
+      setSel(null)
+    }
+  }
+
+  // 用 AI 结果替换指定区间；替换前把整篇压入撤回栈
+  const applyAssist = (range, newText) => {
+    if (!range) return
+    setUndoStack(s => [...s, content])
+    setContent(content.slice(0, range.start) + newText + content.slice(range.end))
+    setSel(null)
+    setTimeout(() => contentRef.current?.focus(), 0)
+  }
+
+  // 撤回最近一次替换：还原整篇到替换前快照
+  const undoLast = () => {
+    setUndoStack(s => {
+      if (!s.length) return s
+      setContent(s[s.length - 1])
+      return s.slice(0, -1)
+    })
+  }
+
   const handleSave = async () => {
     if (savingRef.current || mood) return   // 防重入 + 已保存(卡片已出)不再创建
     if (!title.trim() || !content.trim()) { setError('标题和内容不能为空'); return }
@@ -99,7 +132,8 @@ export default function Write({ onSaved, prefill, onBack }) {
   }
 
   return (
-    <div className="write-page">
+    <div className="write-layout">
+      <div className="write-page">
       <div className="write-top">
         {onBack && <button className="back-btn" onClick={onBack}>← 返回仓库</button>}
         <span className={`auto-state ${autoState}`}>
@@ -144,6 +178,7 @@ export default function Write({ onSaved, prefill, onBack }) {
         placeholder="开始写作…"
         value={content}
         onChange={e => setContent(e.target.value)}
+        onSelect={onContentSelect}
       />
       <div className="write-footer">
         <span className="word-count">{content.replace(/\s/g, '').length} 字</span>
@@ -166,6 +201,16 @@ export default function Write({ onSaved, prefill, onBack }) {
           />
         </div>
       )}
+      </div>
+
+      <AssistPanel
+        sel={sel}
+        collapsed={panelCollapsed}
+        onToggle={() => setPanelCollapsed(c => !c)}
+        onApply={applyAssist}
+        onUndo={undoLast}
+        canUndo={undoStack.length > 0}
+      />
     </div>
   )
 }

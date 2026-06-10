@@ -13,6 +13,7 @@ export const getEssay = (id) => api.get(`/essays/${id}`)
 export const deleteEssay = (id) => api.delete(`/essays/${id}`)
 export const getRandomEssay = () => api.get('/essays/random')
 export const moodReply = (id) => api.post(`/essays/${id}/mood-reply`)
+export const assistReduce = (data) => api.post('/assist/reduce', data)
 export const getPortrait = () => api.get('/stats/portrait')
 export const deepAnalysis = () => api.post('/stats/deep-analysis')
 

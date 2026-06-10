@@ -33,7 +33,7 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="main">
+      <main className={`main ${page === 'write' ? 'main--wide' : ''}`}>
         {page === 'overview' && <Overview onSelect={(id) => navigate('detail', id)} onWrite={() => navigateToWrite()} />}
         {page === 'portrait' && <Portrait />}
         {page === 'vault' && <DraftVault onWrite={(prefill) => navigateToWrite(prefill)} />}
