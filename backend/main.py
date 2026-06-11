@@ -69,6 +69,16 @@ class Essay(Base):
     mood_card = Column(Text)        # JSON: {tone, tone_emoji, keywords[], ai_reply, ai_reply_status, generated_at}
     created_at = Column(DateTime, default=datetime.now)
 
+
+class StyleProfile(Base):
+    __tablename__ = "style_profile"
+    id = Column(Integer, primary_key=True)      # 固定单行，id=1
+    content = Column(Text)                       # 注入用的 SOUL 串（用户可改后的最终版）
+    rationale = Column(Text)                     # JSON：分维度依据
+    source_essay_ids = Column(Text)              # JSON 数组：本次养成用了哪几篇
+    generated_at = Column(DateTime, default=datetime.now)
+    user_edited = Column(Integer, default=0)     # 0/1
+
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 
