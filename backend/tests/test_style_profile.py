@@ -78,3 +78,37 @@ def test_parse_soul_json_fallback_on_garbage():
     # 兜底：soul 用原文，rationale 为空 dict，不抛异常
     assert out["soul"] == raw.strip()
     assert out["rationale"] == {}
+
+
+def test_generate_requires_essay_ids(client, db):
+    r = client.post("/style-profile/generate", json={"essay_ids": []})
+    assert r.status_code == 400
+
+
+def test_generate_creates_single_row_and_uses_sonnet(client, seed_essays, mock_anthropic):
+    mock_anthropic.set_text('{"soul":"偏好短句，善用感官意象，情绪克制。","rationale":{"rhythm":"短句为主","imagery":"感官意象","emotion":"克制","diction":"书面","signature":"留白"}}')
+    r = client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["content"].startswith("偏好短句")
+    assert body["rationale"]["rhythm"] == "短句为主"
+    assert sorted(body["source_essay_ids"]) == sorted(seed_essays)
+    # 用了 Sonnet
+    assert mock_anthropic.captured.get("model") == "claude-sonnet-4-6"
+    # 落库单行
+    s = main.Session()
+    assert s.query(main.StyleProfile).count() == 1
+    row = s.query(main.StyleProfile).first()
+    assert row.user_edited == 0
+    s.close()
+
+
+def test_generate_is_idempotent_single_row(client, seed_essays, mock_anthropic):
+    mock_anthropic.set_text('{"soul":"第一版","rationale":{}}')
+    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    mock_anthropic.set_text('{"soul":"第二版","rationale":{}}')
+    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    s = main.Session()
+    assert s.query(main.StyleProfile).count() == 1  # upsert，不新增第二行
+    assert s.query(main.StyleProfile).first().content == "第二版"
+    s.close()

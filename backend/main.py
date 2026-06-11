@@ -642,6 +642,90 @@ def assist_expand(data: AssistRequest):
     return _assist_call(data, user, max_tokens=700, parse_options=False)
 
 
+# ── 风格 SOUL 文档 ──
+class StyleProfileGenerateRequest(BaseModel):
+    essay_ids: list[int]
+
+
+def _build_soul_prompt(portrait: dict, excerpts: str) -> str:
+    return (
+        "以下是某作者的写作风格量化数据与若干篇原文摘录。\n\n"
+        "## 量化锚点（客观统计，供参考，勿照搬数字）\n"
+        f"- 情感基调：{portrait.get('tone')}\n"
+        f"- 句式偏好：{portrait.get('sentence_style')}（平均句长 {portrait.get('avg_sentence_length')} 字）\n"
+        f"- 词汇丰富度：{portrait.get('vocab_richness')}（TTR={portrait.get('ttr')}）\n"
+        f"- 标点习惯：{portrait.get('punct_style')}\n"
+        f"- 段落风格：{portrait.get('para_style')}\n"
+        f"- 篇幅偏好：{portrait.get('volume_style')}\n"
+        f"- 灵魂词汇：{', '.join(portrait.get('soul_words', []))}\n\n"
+        "## 原文摘录（保留了原始断句与节奏，请重点感受其节奏与意象）\n"
+        f"{excerpts}\n\n"
+        "请分两步：\n"
+        "第一步（在心里分析，不要输出）：从五个维度刻画该作者的风格——\n"
+        "  1) 句子节奏与长短  2) 意象/感官/比喻倾向  3) 情绪表达方式（克制/外放/叙事）\n"
+        "  4) 用词（口语/书面/文学性）  5) 标志性手法（标点、留白、重复、转折等）\n"
+        "第二步（输出）：把以上压缩成一段 100–200 字的密集风格指令，可直接注入用于指挥 AI 模仿该风格写作。\n\n"
+        "以严格 JSON 输出，不要任何额外文字：\n"
+        '{"soul":"……100-200字的风格指令……",'
+        '"rationale":{"rhythm":"句子节奏一句话","imagery":"意象感官一句话",'
+        '"emotion":"情绪表达一句话","diction":"用词一句话","signature":"标志性手法一句话"}}'
+    )
+
+
+SOUL_SYSTEM = (
+    "你是一名法医语言学家 + 中文写作风格分析师，擅长从文本中识别作者独有的声音，"
+    "并把它压缩成可直接用于指导写作的风格指令。只描述特征，不评价好坏，"
+    "不使用「该作者/这位作者」等人称，直接描述风格本身。"
+)
+
+
+@app.post("/style-profile/generate")
+def generate_style_profile(req: StyleProfileGenerateRequest):
+    if not req.essay_ids:
+        raise HTTPException(status_code=400, detail="请至少选择一篇文章")
+    session = Session()
+    essays = session.query(Essay).filter(Essay.id.in_(req.essay_ids)).order_by(Essay.date).all()
+    if not essays:
+        session.close()
+        raise HTTPException(status_code=400, detail="选中的文章不存在")
+    portrait = compute_portrait(essays)
+    excerpts = _sample_excerpts(essays)
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=800,
+            system=SOUL_SYSTEM,
+            messages=[{"role": "user", "content": _build_soul_prompt(portrait, excerpts)}],
+        )
+        parsed = _parse_soul_json(message.content[0].text)
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.close()
+        print(f"[soul] generate error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+    if not row:
+        row = StyleProfile(id=1)
+        session.add(row)
+    row.content = parsed["soul"]
+    row.rationale = json.dumps(parsed["rationale"], ensure_ascii=False)
+    row.source_essay_ids = json.dumps([e.id for e in essays])
+    row.generated_at = datetime.now()
+    row.user_edited = 0
+    session.commit()
+    result = {
+        "content": row.content,
+        "rationale": parsed["rationale"],
+        "source_essay_ids": [e.id for e in essays],
+        "generated_at": row.generated_at.isoformat(),
+        "user_edited": 0,
+    }
+    session.close()
+    return result
+
+
 @app.delete("/essays/{essay_id}")
 def delete_essay(essay_id: int):
     session = Session()
