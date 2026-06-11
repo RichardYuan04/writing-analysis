@@ -517,28 +517,42 @@ def _sample_excerpts(essays, per_essay_cap: int = 400, total_cap: int = 800) -> 
     return "\n\n".join(parts)
 
 
-def _parse_soul_json(raw: str) -> dict:
-    """把模型返回解析成 {soul, rationale}。容错：去 ```fence、抓首个 {..} 块；
-    彻底失败则把整段当 soul 兜底，绝不抛异常。"""
+_SOUL_LABELS = [("节奏", "rhythm"), ("意象", "imagery"), ("情绪", "emotion"),
+                ("用词", "diction"), ("手法", "signature")]
+
+
+def _parse_soul_output(raw: str) -> dict:
+    """解析「标签分段」格式 → {soul, rationale}。
+    不用 JSON：中文风格串里常含引号/标点，会冲破 JSON；标签分段对此免疫。
+    期望格式：
+        【SOUL】
+        <100-200字风格指令>
+        【节奏】…【意象】…【情绪】…【用词】…【手法】…
+    解析失败时把整段（去围栏后）当 soul 兜底，绝不抛异常。"""
     text = (raw or "").strip()
-    # 去掉 ```json ... ``` 围栏
-    fence = re.search(r"```(?:json)?\s*(.+?)\s*```", text, re.DOTALL)
+    # 去掉可能的 ``` 围栏
+    fence = re.search(r"```(?:\w+)?\s*(.+?)\s*```", text, re.DOTALL)
     if fence:
         text = fence.group(1).strip()
-    # 抓第一个 { 到最后一个 } 的块
-    start, end = text.find("{"), text.rfind("}")
-    candidate = text[start:end + 1] if (start != -1 and end > start) else text
-    try:
-        data = json.loads(candidate)
-        soul = (data.get("soul") or "").strip()
-        rationale = data.get("rationale") or {}
-        if not isinstance(rationale, dict):
-            rationale = {}
-        if soul:
-            return {"soul": soul, "rationale": rationale}
-    except Exception:
-        pass
-    return {"soul": (raw or "").strip(), "rationale": {}}
+    # 逐维抓 rationale（一行一句）
+    rationale = {}
+    for zh, key in _SOUL_LABELS:
+        m = re.search(rf"【{zh}】[:：]?\s*(.+)", text)
+        if m:
+            v = m.group(1).strip()
+            if v:
+                rationale[key] = v
+    # 抓 SOUL：从【SOUL】到第一个维度标签（或文末）之间
+    soul = ""
+    m = re.search(r"【SOUL】[:：]?\s*(.+?)\s*(?=【(?:节奏|意象|情绪|用词|手法)】|$)",
+                  text, re.DOTALL)
+    if m:
+        soul = m.group(1).strip()
+    if not soul:
+        # 兜底：去掉所有【…】标签行，剩下的当 soul；再不行就用整段
+        stripped = re.sub(r"【[^】]*】[:：]?[^\n]*", "", text).strip()
+        soul = stripped or text
+    return {"soul": soul, "rationale": rationale}
 
 
 # ── 写作工具面板 ──
@@ -675,10 +689,9 @@ def _build_soul_prompt(portrait: dict, excerpts: str) -> str:
         "  1) 句子节奏与长短  2) 意象/感官/比喻倾向  3) 情绪表达方式（克制/外放/叙事）\n"
         "  4) 用词（口语/书面/文学性）  5) 标志性手法（标点、留白、重复、转折等）\n"
         "第二步（输出）：把以上压缩成一段 100–200 字的密集风格指令，可直接注入用于指挥 AI 模仿该风格写作。\n\n"
-        "以严格 JSON 输出，不要任何额外文字：\n"
-        '{"soul":"……100-200字的风格指令……",'
-        '"rationale":{"rhythm":"句子节奏一句话","imagery":"意象感官一句话",'
-        '"emotion":"情绪表达一句话","diction":"用词一句话","signature":"标志性手法一句话"}}'
+        "请严格按以下格式输出，不要使用 JSON、不要加任何额外说明文字（风格串里可自由使用引号和标点）：\n"
+        "【SOUL】\n（这里写 100-200 字的风格指令）\n\n"
+        "【节奏】（一句话）\n【意象】（一句话）\n【情绪】（一句话）\n【用词】（一句话）\n【手法】（一句话）"
     )
 
 
@@ -707,7 +720,7 @@ def generate_style_profile(req: StyleProfileGenerateRequest):
             system=SOUL_SYSTEM,
             messages=[{"role": "user", "content": _build_soul_prompt(portrait, excerpts)}],
         )
-        parsed = _parse_soul_json(message.content[0].text)
+        parsed = _parse_soul_output(message.content[0].text)
     except HTTPException:
         raise
     except Exception as e:

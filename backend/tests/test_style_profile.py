@@ -52,31 +52,35 @@ def test_sample_excerpts_stops_at_total_cap():
     assert out.count("字") <= 900
 
 
-def test_parse_soul_json_plain():
-    raw = '{"soul":"偏好短句，重意象。","rationale":{"rhythm":"短","imagery":"多","emotion":"克制","diction":"书面","signature":"留白"}}'
-    out = main._parse_soul_json(raw)
-    assert out["soul"].startswith("偏好短句")
+def test_parse_soul_output_labeled():
+    raw = "【SOUL】\n偏好短句，善用感官意象，情绪克制。\n\n【节奏】短句为主\n【意象】感官意象\n【情绪】克制\n【用词】书面\n【手法】留白"
+    out = main._parse_soul_output(raw)
+    assert out["soul"] == "偏好短句，善用感官意象，情绪克制。"
+    assert out["rationale"]["rhythm"] == "短句为主"
+    assert out["rationale"]["signature"] == "留白"
+
+
+def test_parse_soul_output_quotes_dont_break_parsing():
+    # 风格串里含引号/标点 —— 这正是 JSON 方案翻车的根因，标签分段必须免疫
+    raw = '【SOUL】\n善用「留白」，句子像"一封写给自己的信"，克制而有余味。\n\n【节奏】长短交错\n【意象】丰富'
+    out = main._parse_soul_output(raw)
+    assert "留白" in out["soul"]
+    assert '"一封写给自己的信"' in out["soul"]
+    assert out["rationale"]["rhythm"] == "长短交错"
+
+
+def test_parse_soul_output_with_code_fence():
+    raw = '```\n【SOUL】\nx的风格\n【节奏】短\n```'
+    out = main._parse_soul_output(raw)
+    assert out["soul"] == "x的风格"
     assert out["rationale"]["rhythm"] == "短"
 
 
-def test_parse_soul_json_with_code_fence():
-    raw = '```json\n{"soul":"x","rationale":{}}\n```'
-    out = main._parse_soul_json(raw)
-    assert out["soul"] == "x"
-    assert out["rationale"] == {}
-
-
-def test_parse_soul_json_with_surrounding_text():
-    raw = '好的，分析如下：\n{"soul":"y","rationale":{"rhythm":"短"}}\n以上。'
-    out = main._parse_soul_json(raw)
-    assert out["soul"] == "y"
-
-
-def test_parse_soul_json_fallback_on_garbage():
-    raw = '这不是 JSON，只是一段风格描述：偏好短句。'
-    out = main._parse_soul_json(raw)
-    # 兜底：soul 用原文，rationale 为空 dict，不抛异常
-    assert out["soul"] == raw.strip()
+def test_parse_soul_output_fallback_no_marker():
+    raw = '偏好短句，情绪克制。'
+    out = main._parse_soul_output(raw)
+    # 无标签时整段当 soul，rationale 为空，不抛异常
+    assert out["soul"] == "偏好短句，情绪克制。"
     assert out["rationale"] == {}
 
 
@@ -86,7 +90,7 @@ def test_generate_requires_essay_ids(client, db):
 
 
 def test_generate_creates_single_row_and_uses_sonnet(client, seed_essays, mock_anthropic):
-    mock_anthropic.set_text('{"soul":"偏好短句，善用感官意象，情绪克制。","rationale":{"rhythm":"短句为主","imagery":"感官意象","emotion":"克制","diction":"书面","signature":"留白"}}')
+    mock_anthropic.set_text("【SOUL】\n偏好短句，善用感官意象，情绪克制。\n\n【节奏】短句为主\n【意象】感官意象\n【情绪】克制\n【用词】书面\n【手法】留白")
     r = client.post("/style-profile/generate", json={"essay_ids": seed_essays})
     assert r.status_code == 200
     body = r.json()
@@ -104,9 +108,9 @@ def test_generate_creates_single_row_and_uses_sonnet(client, seed_essays, mock_a
 
 
 def test_generate_is_idempotent_single_row(client, seed_essays, mock_anthropic):
-    mock_anthropic.set_text('{"soul":"第一版","rationale":{}}')
+    mock_anthropic.set_text("【SOUL】\n第一版")
     client.post("/style-profile/generate", json={"essay_ids": seed_essays})
-    mock_anthropic.set_text('{"soul":"第二版","rationale":{}}')
+    mock_anthropic.set_text("【SOUL】\n第二版")
     client.post("/style-profile/generate", json={"essay_ids": seed_essays})
     s = main.Session()
     assert s.query(main.StyleProfile).count() == 1  # upsert，不新增第二行
@@ -121,7 +125,7 @@ def test_get_style_profile_empty(client, db):
 
 
 def test_get_style_profile_after_generate(client, seed_essays, mock_anthropic):
-    mock_anthropic.set_text('{"soul":"偏好短句。","rationale":{"rhythm":"短"}}')
+    mock_anthropic.set_text("【SOUL】\n偏好短句。\n\n【节奏】短")
     client.post("/style-profile/generate", json={"essay_ids": seed_essays})
     r = client.get("/style-profile")
     body = r.json()
@@ -133,7 +137,7 @@ def test_get_style_profile_after_generate(client, seed_essays, mock_anthropic):
 
 
 def test_put_style_profile_sets_user_edited(client, seed_essays, mock_anthropic):
-    mock_anthropic.set_text('{"soul":"原始版","rationale":{}}')
+    mock_anthropic.set_text("【SOUL】\n原始版")
     client.post("/style-profile/generate", json={"essay_ids": seed_essays})
     r = client.put("/style-profile", json={"content": "我手改后的风格串"})
     assert r.status_code == 200
@@ -174,7 +178,7 @@ def test_assist_synonyms_and_expand_use_sonnet(client, db, mock_anthropic):
 
 def test_assist_injects_soul_when_present(client, seed_essays, mock_anthropic):
     # 先造一份 SOUL 文档
-    mock_anthropic.set_text('{"soul":"偏好短句，情绪克制。","rationale":{}}')
+    mock_anthropic.set_text("【SOUL】\n偏好短句，情绪克制。")
     client.post("/style-profile/generate", json={"essay_ids": seed_essays})
     # 再调 reduce，断言 system 注入了 SOUL 内容
     mock_anthropic.set_text("压缩结果")
