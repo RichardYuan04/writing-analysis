@@ -148,3 +148,45 @@ def test_put_style_profile_without_existing_creates_row(client, db):
     assert r.status_code == 200
     assert r.json()["content"] == "凭空写一版"
     assert r.json()["user_edited"] == 1
+
+
+def test_assist_reduce_uses_haiku(client, db, mock_anthropic):
+    mock_anthropic.set_text("压缩后的文字")
+    r = client.post("/assist/reduce", json={"text": "一段需要压缩的较长的文字内容。"})
+    assert r.status_code == 200
+    assert mock_anthropic.captured["model"] == "claude-haiku-4-5-20251001"
+
+
+def test_assist_metaphor_uses_opus(client, db, mock_anthropic):
+    mock_anthropic.set_text("1. 像一根抽走的细线\n2. 像午后停电")
+    r = client.post("/assist/metaphor", json={"text": "一种说不清的失落。"})
+    assert r.status_code == 200
+    assert mock_anthropic.captured["model"] == "claude-opus-4-8"
+
+
+def test_assist_synonyms_and_expand_use_sonnet(client, db, mock_anthropic):
+    mock_anthropic.set_text("候选")
+    client.post("/assist/synonyms", json={"text": "怅然若失的感觉。"})
+    assert mock_anthropic.captured["model"] == "claude-sonnet-4-6"
+    client.post("/assist/expand", json={"text": "他走了。"})
+    assert mock_anthropic.captured["model"] == "claude-sonnet-4-6"
+
+
+def test_assist_injects_soul_when_present(client, seed_essays, mock_anthropic):
+    # 先造一份 SOUL 文档
+    mock_anthropic.set_text('{"soul":"偏好短句，情绪克制。","rationale":{}}')
+    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    # 再调 reduce，断言 system 注入了 SOUL 内容
+    mock_anthropic.set_text("压缩结果")
+    client.post("/assist/reduce", json={"text": "一段较长的需要压缩的文字。"})
+    sys_prompt = mock_anthropic.captured["system"]
+    assert "偏好短句，情绪克制。" in sys_prompt
+
+
+def test_assist_degrades_without_soul(client, db, mock_anthropic):
+    mock_anthropic.set_text("压缩结果")
+    client.post("/assist/reduce", json={"text": "一段较长的需要压缩的文字。"})
+    sys_prompt = mock_anthropic.captured["system"]
+    # 走降级分支：不含「该作者的写作风格为」，含降级文案
+    assert "该作者的写作风格为" not in sys_prompt
+    assert "保持与原文及上下文一致" in sys_prompt

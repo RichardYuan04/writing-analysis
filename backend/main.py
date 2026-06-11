@@ -560,6 +560,16 @@ def _assist_system(style_profile: str) -> str:
     return f"你是写作助手。{style_line}\n直接输出建议内容，不要解释、不要加前缀。"
 
 
+def _load_soul_content() -> str:
+    """从库里读当前 SOUL 文档的 content；没有则返回空串（走降级分支）。"""
+    session = Session()
+    try:
+        row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+        return (row.content or "").strip() if row else ""
+    finally:
+        session.close()
+
+
 def _parse_options(raw: str) -> list:
     """把「每行一个选项（可能带 1. / - 编号）」的输出解析成列表。"""
     out = []
@@ -575,15 +585,15 @@ def _parse_options(raw: str) -> list:
     return out[:4]
 
 
-def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options: bool):
+def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options: bool, model: str):
     text = (data.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="选中文字不能为空")
     try:
         message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=model,
             max_tokens=max_tokens,
-            system=_assist_system(data.style_profile),
+            system=_assist_system(_load_soul_content()),
             messages=[{"role": "user", "content": user}],
         )
         raw = message.content[0].text.strip()
@@ -609,7 +619,7 @@ def assist_reduce(data: AssistRequest):
         "要求：保留核心意思和情感，删去冗余表达，保持作者的句式风格，直接输出压缩后的文字。\n\n"
         f"原文：{data.text.strip()}"
     )
-    return _assist_call(data, user, max_tokens=512, parse_options=False)
+    return _assist_call(data, user, max_tokens=512, parse_options=False, model="claude-haiku-4-5-20251001")
 
 
 @app.post("/assist/synonyms")
@@ -619,7 +629,7 @@ def assist_synonyms(data: AssistRequest):
         "要求：保持原意，贴合上下文语境，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
         f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=300, parse_options=True)
+    return _assist_call(data, user, max_tokens=300, parse_options=True, model="claude-sonnet-4-6")
 
 
 @app.post("/assist/metaphor")
@@ -629,7 +639,7 @@ def assist_metaphor(data: AssistRequest):
         "要求：比喻贴合上下文语境，避免陈词滥调，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
         f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=400, parse_options=True)
+    return _assist_call(data, user, max_tokens=400, parse_options=True, model="claude-opus-4-8")
 
 
 @app.post("/assist/expand")
@@ -639,7 +649,7 @@ def assist_expand(data: AssistRequest):
         "要求：补充细节、感受或场景描写，自然融入原文语境，保持作者风格，直接输出扩展后的文字。\n\n"
         f"原文：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=700, parse_options=False)
+    return _assist_call(data, user, max_tokens=700, parse_options=False, model="claude-sonnet-4-6")
 
 
 # ── 风格 SOUL 文档 ──
