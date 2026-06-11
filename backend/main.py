@@ -758,6 +758,40 @@ def get_style_profile():
     return result
 
 
+class StyleProfileUpdateRequest(BaseModel):
+    content: str
+
+
+@app.put("/style-profile")
+def update_style_profile(req: StyleProfileUpdateRequest):
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+    if not row:
+        row = StyleProfile(id=1, source_essay_ids="[]", rationale="{}")
+        session.add(row)
+    row.content = (req.content or "").strip()
+    row.user_edited = 1
+    row.generated_at = datetime.now()
+    session.commit()
+    try:
+        ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
+    except Exception:
+        ids = []
+    try:
+        rationale = json.loads(row.rationale) if row.rationale else {}
+    except Exception:
+        rationale = {}
+    result = {
+        "content": row.content,
+        "rationale": rationale,
+        "source_essay_ids": ids,
+        "generated_at": row.generated_at.isoformat(),
+        "user_edited": 1,
+    }
+    session.close()
+    return result
+
+
 @app.delete("/essays/{essay_id}")
 def delete_essay(essay_id: int):
     session = Session()

@@ -130,3 +130,21 @@ def test_get_style_profile_after_generate(client, seed_essays, mock_anthropic):
     assert body["rationale"]["rhythm"] == "短"
     assert "generated_at" in body
     assert body["new_essays_since"] == 0  # 生成后没有更新的文章
+
+
+def test_put_style_profile_sets_user_edited(client, seed_essays, mock_anthropic):
+    mock_anthropic.set_text('{"soul":"原始版","rationale":{}}')
+    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    r = client.put("/style-profile", json={"content": "我手改后的风格串"})
+    assert r.status_code == 200
+    assert r.json()["content"] == "我手改后的风格串"
+    assert r.json()["user_edited"] == 1
+    # source_essay_ids 不变
+    assert sorted(r.json()["source_essay_ids"]) == sorted(seed_essays)
+
+
+def test_put_style_profile_without_existing_creates_row(client, db):
+    r = client.put("/style-profile", json={"content": "凭空写一版"})
+    assert r.status_code == 200
+    assert r.json()["content"] == "凭空写一版"
+    assert r.json()["user_edited"] == 1
