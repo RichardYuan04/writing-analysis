@@ -726,6 +726,38 @@ def generate_style_profile(req: StyleProfileGenerateRequest):
     return result
 
 
+@app.get("/style-profile")
+def get_style_profile():
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+    if not row:
+        session.close()
+        return {"exists": False}
+    # 自上次养成后，更新过/新建过的文章数（按 created_at 粗略估计）
+    new_count = 0
+    if row.generated_at:
+        new_count = session.query(Essay).filter(Essay.created_at > row.generated_at).count()
+    try:
+        rationale = json.loads(row.rationale) if row.rationale else {}
+    except Exception:
+        rationale = {}
+    try:
+        ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
+    except Exception:
+        ids = []
+    result = {
+        "exists": True,
+        "content": row.content or "",
+        "rationale": rationale,
+        "source_essay_ids": ids,
+        "generated_at": row.generated_at.isoformat() if row.generated_at else None,
+        "user_edited": int(row.user_edited or 0),
+        "new_essays_since": new_count,
+    }
+    session.close()
+    return result
+
+
 @app.delete("/essays/{essay_id}")
 def delete_essay(essay_id: int):
     session = Session()

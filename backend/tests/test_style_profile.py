@@ -112,3 +112,21 @@ def test_generate_is_idempotent_single_row(client, seed_essays, mock_anthropic):
     assert s.query(main.StyleProfile).count() == 1  # upsert，不新增第二行
     assert s.query(main.StyleProfile).first().content == "第二版"
     s.close()
+
+
+def test_get_style_profile_empty(client, db):
+    r = client.get("/style-profile")
+    assert r.status_code == 200
+    assert r.json() == {"exists": False}
+
+
+def test_get_style_profile_after_generate(client, seed_essays, mock_anthropic):
+    mock_anthropic.set_text('{"soul":"偏好短句。","rationale":{"rhythm":"短"}}')
+    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    r = client.get("/style-profile")
+    body = r.json()
+    assert body["exists"] is True
+    assert body["content"] == "偏好短句。"
+    assert body["rationale"]["rhythm"] == "短"
+    assert "generated_at" in body
+    assert body["new_essays_since"] == 0  # 生成后没有更新的文章
