@@ -51,7 +51,7 @@ app.add_middleware(
 )
 
 # 数据库
-engine = create_engine("sqlite:///./essays.db")
+engine = create_engine(os.getenv("ESSAYS_DB_URL", "sqlite:///./essays.db"))
 Base = declarative_base()
 
 class Essay(Base):
