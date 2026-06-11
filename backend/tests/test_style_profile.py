@@ -187,6 +187,18 @@ def test_assist_injects_soul_when_present(client, seed_essays, mock_anthropic):
     assert "偏好短句，情绪克制。" in sys_prompt
 
 
+def test_assist_metaphor_does_not_inject_soul(client, seed_essays, mock_anthropic):
+    # 即使存在 SOUL 文档，比喻也完全放开、不注入它
+    mock_anthropic.set_text("【SOUL】\n善用感官意象，情绪克制。")
+    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    mock_anthropic.set_text("1. 像一根被抽走的细线\n2. 像午后忽然停电")
+    client.post("/assist/metaphor", json={"text": "一种说不清的失落。"})
+    sys_prompt = mock_anthropic.captured["system"]
+    assert "善用感官意象" not in sys_prompt      # 不带 SOUL 的意象
+    assert "该作者的写作风格为" not in sys_prompt  # 不注入 SOUL
+    assert "比喻" in sys_prompt                   # 用了比喻专属 system
+
+
 def test_assist_degrades_without_soul(client, db, mock_anthropic):
     mock_anthropic.set_text("压缩结果")
     client.post("/assist/reduce", json={"text": "一段较长的需要压缩的文字。"})

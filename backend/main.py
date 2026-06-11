@@ -599,15 +599,18 @@ def _parse_options(raw: str) -> list:
     return out[:4]
 
 
-def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options: bool, model: str):
+def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options: bool, model: str,
+                 system: str = None):
     text = (data.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="选中文字不能为空")
+    # system 为 None 时默认注入 SOUL；显式传入（如比喻）则用传入的，不注入 SOUL
+    sys_prompt = system if system is not None else _assist_system(_load_soul_content())
     try:
         message = anthropic_client.messages.create(
             model=model,
             max_tokens=max_tokens,
-            system=_assist_system(_load_soul_content()),
+            system=sys_prompt,
             messages=[{"role": "user", "content": user}],
         )
         raw = message.content[0].text.strip()
@@ -646,14 +649,27 @@ def assist_synonyms(data: AssistRequest):
     return _assist_call(data, user, max_tokens=300, parse_options=True, model="claude-sonnet-4-6")
 
 
+METAPHOR_SYSTEM = (
+    "你是一位精于比喻的中文写作高手。请完全自由地探索喻体、比喻方式与遣词造句，"
+    "不必受作者既有风格的约束，大胆出新意。"
+    "只输出比喻本身，每个一行，不要解释、不要加前缀。"
+)
+
+
 @app.post("/assist/metaphor")
 def assist_metaphor(data: AssistRequest):
     user = (
-        "请为以下文字提供 2-3 个比喻表达，帮助将其意象化或更有画面感。\n"
-        "要求：比喻贴合上下文语境，避免陈词滥调，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
+        "请为下面这段文字提供 2-3 个比喻。\n"
+        "要求：\n"
+        "1. 先抓住这段文字真正想表达的核心关系或感受，再为这个内核打比方；不要逐字给整段套比喻。\n"
+        "2. 如果选中文字里本身已经含有一个比喻，就顺着它的思路，给出 2-3 个【平行的、全新的】比喻"
+        "（保留同样的表达结构，但换用不同的喻体），作为可替换或扩充的备选。\n"
+        "3. 喻体要新鲜多样、彼此不同，避免陈词滥调，也不要与原文已有的喻体重复。\n"
+        "4. 每个比喻单独一行，直接输出。\n\n"
         f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=400, parse_options=True, model="claude-opus-4-8")
+    return _assist_call(data, user, max_tokens=400, parse_options=True,
+                        model="claude-opus-4-8", system=METAPHOR_SYSTEM)
 
 
 @app.post("/assist/expand")
