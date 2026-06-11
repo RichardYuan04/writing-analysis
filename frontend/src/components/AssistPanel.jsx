@@ -17,7 +17,8 @@ import { assistReduce, assistSynonyms, assistMetaphor, assistExpand } from '../a
 const ACTIONS = [
   { key: 'reduce',   label: '✂️ 缩减',   kind: 'single',  call: assistReduce,   running: '正在缩减…',   cap: '缩减结果' },
   { key: 'synonym',  label: '↔ 同义替换', kind: 'options', call: assistSynonyms, running: '正在找同义…', cap: '同义替换（点选采用）' },
-  { key: 'metaphor', label: '✦ 比喻',     kind: 'options', call: assistMetaphor, running: '正在打比方…', cap: '比喻建议（点选复制，自行粘回去改）', copy: true },
+  { key: 'metaphor', label: '✦ 比喻',     kind: 'options', call: assistMetaphor, running: '正在打比方…', cap: '比喻建议（点选复制，自行粘回去改）', copy: true,
+    help: '比喻会完全放开：模型自由探索喻体、说法和遣词，不受你的风格档案约束。\n它会先抓住选中文字的核心关系再打比方；如果你选中的内容本身已是一个比喻，它会顺势给出几个平行的新比喻作为替换备选。\n小技巧：想针对某一个具体比喻做扩展，直接圈选那一小句，结果最精准。' },
   { key: 'expand',   label: '✚ 扩展',     kind: 'single',  call: assistExpand,   running: '正在扩展…',   cap: '扩展结果' },
 ]
 
@@ -134,7 +135,15 @@ export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo,
             <div className="ap-orig">{sel.text.slice(0, 40)}{sel.text.length > 40 ? '…' : ''}</div>
             <div className="ap-actions">
               {ACTIONS.map(a => (
-                <button key={a.key} className="ap-action" onClick={() => run(a, sel)}>{a.label}</button>
+                <span key={a.key} className="ap-action-wrap">
+                  <button className="ap-action" onClick={() => run(a, sel)}>{a.label}</button>
+                  {a.help && (
+                    <span className="ap-help" tabIndex={0} onClick={e => e.stopPropagation()}>
+                      ?
+                      <span className="ap-help-pop">{a.help}</span>
+                    </span>
+                  )}
+                </span>
               ))}
             </div>
           </>
