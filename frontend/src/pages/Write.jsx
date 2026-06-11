@@ -105,7 +105,16 @@ export default function Write({ onSaved, prefill, onBack }) {
     setUndoStack(s => [...s, content])
     setContent(content.slice(0, range.start) + newText + content.slice(range.end))
     setSel(null)
-    setTimeout(() => contentRef.current?.focus(), 0)
+    // 替换后把选区设到「新文字」范围：既高亮提示改了哪段，又让视图滚到此处。
+    // （此前只调 focus() 不设选区，光标默认落到文末，导致正文滚到最底部——就是那个 bug）
+    const newStart = range.start
+    const newEnd = range.start + newText.length
+    setTimeout(() => {
+      const el = contentRef.current
+      if (!el) return
+      el.focus()
+      try { el.setSelectionRange(newStart, newEnd) } catch { /* 忽略 */ }
+    }, 0)
   }
 
   // 撤回最近一次替换：还原整篇到替换前快照
