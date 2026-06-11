@@ -20,6 +20,10 @@ export const assistExpand = (data) => api.post('/assist/expand', data)
 export const getPortrait = () => api.get('/stats/portrait')
 export const deepAnalysis = () => api.post('/stats/deep-analysis')
 
+export const getStyleProfile = () => api.get('/style-profile')
+export const generateStyleProfile = (essayIds) => api.post('/style-profile/generate', { essay_ids: essayIds })
+export const saveStyleProfile = (content) => api.put('/style-profile', { content })
+
 export const getOverview = (startDate, endDate) => {
   const params = {}
   if (startDate) params.start_date = startDate
