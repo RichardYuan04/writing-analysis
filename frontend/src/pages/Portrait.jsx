@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getPortrait, essayDeepAnalysis } from '../api'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import EssayPicker from '../components/EssayPicker'
+import SoulDocPanel from '../components/SoulDocPanel'
 import {
   AuthorCard, WordCloudPanel, DimensionsPanel,
   StructureTimeline, KeyPointsPanel, SentimentBar,
@@ -54,6 +55,8 @@ export default function Portrait() {
     <div className="portrait-page">
       <h1 className="portrait-title">你的写作画像</h1>
       <p className="portrait-sub">基于你全部随笔的本地分析，无数据上传</p>
+
+      <SoulDocPanel />
 
       {/* 雷达图 */}
       <div className="section">
