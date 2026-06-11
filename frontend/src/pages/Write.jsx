@@ -77,12 +77,23 @@ export default function Write({ onSaved, prefill, onBack }) {
 
   const nextQuote = () => setQuote(q => pickQuote(q))
 
+  // 取选区前后各一句作为上下文（给同义/比喻/扩展用）
+  const ctxOf = (full, start, end) => {
+    const SEP = /[。！？!?\n]/
+    const before = full.slice(0, start).split(SEP)
+    const after = full.slice(end).split(SEP)
+    const prev = (before[before.length - 1] || '').trim()
+    const next = (after[0] || '').trim()
+    return [prev, next].filter(Boolean).join(' … ')
+  }
+
   // 正文选区变化 → 同步给右侧面板（≥4 字才算有效选中）
   const onContentSelect = (e) => {
     const el = e.target
-    const text = el.value.slice(el.selectionStart, el.selectionEnd)
+    const { selectionStart: s, selectionEnd: t, value } = el
+    const text = value.slice(s, t)
     if (text.trim().length >= 4) {
-      setSel({ start: el.selectionStart, end: el.selectionEnd, text })
+      setSel({ start: s, end: t, text, context: ctxOf(value, s, t) })
     } else {
       setSel(null)
     }

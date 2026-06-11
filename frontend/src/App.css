@@ -349,6 +349,16 @@
   font-size: 13px; padding: 6px 14px; border-radius: 18px; cursor: pointer;
 }
 .ap-action:hover { background: #FBF6EC; }
+.ap-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.ap-option {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  text-align: left; border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-primary); font-family: var(--font-serif); font-size: 13.5px; line-height: 1.6;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; width: 100%;
+}
+.ap-option:hover { border-color: var(--accent-light); background: #FBF6EC; }
+.ap-option-txt { flex: 1; }
+.ap-copied { flex-shrink: 0; font-size: 11px; color: var(--accent); white-space: nowrap; margin-top: 2px; }
 .ap-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .ap-apply {
   border: 1px solid var(--accent-light); background: var(--accent); color: #fff;

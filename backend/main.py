@@ -487,8 +487,8 @@ def essay_mood_reply(essay_id: int):
     return mood
 
 
-# ── 写作浮层工具箱 ──
-# 无状态文本变换：选中一段文字 → AI 辅助。当前先打通「缩减」一条。
+# ── 写作工具面板 ──
+# 无状态文本变换：选中一段文字 → AI 辅助。四类：缩减/同义替换/比喻/扩展。
 # style_profile 为可选；缺省时走降级分支（仅要求贴合原文与上下文，不强加风格）。
 class AssistRequest(BaseModel):
     text: str
@@ -503,31 +503,89 @@ def _assist_system(style_profile: str) -> str:
                       "所有建议必须与该风格保持一致，不要改变作者的声音和语气。")
     else:
         style_line = "保持与原文及上下文一致的语气和风格，不要改变作者的声音。"
-    return f"你是写作助手。{style_line}\n直接输出结果，不要解释、不要加前缀、不要加引号。"
+    return f"你是写作助手。{style_line}\n直接输出建议内容，不要解释、不要加前缀。"
+
+
+def _parse_options(raw: str) -> list:
+    """把「每行一个选项（可能带 1. / - 编号）」的输出解析成列表。"""
+    out = []
+    for line in (raw or "").splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        s = re.sub(r'^\s*\d+[\.\、\)]\s*', '', s)   # 去 "1." "1、" "1)"
+        s = re.sub(r'^\s*[-•·]\s*', '', s)           # 去 "- " "• "
+        s = s.strip().strip('「」""\'').strip()
+        if s:
+            out.append(s)
+    return out[:4]
+
+
+def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options: bool):
+    text = (data.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="选中文字不能为空")
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=max_tokens,
+            system=_assist_system(data.style_profile),
+            messages=[{"role": "user", "content": user}],
+        )
+        raw = message.content[0].text.strip()
+        if parse_options:
+            return {"options": _parse_options(raw)}
+        return {"result": raw.strip('「」""\'').strip()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[assist] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+
+def _ctx_line(ctx: str) -> str:
+    ctx = (ctx or "").strip()
+    return f"\n上下文（前后各一句）：{ctx}" if ctx else ""
 
 
 @app.post("/assist/reduce")
 def assist_reduce(data: AssistRequest):
-    text = (data.text or "").strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="选中文字不能为空")
     user = (
         "请将以下文字压缩至原来约一半的长度。\n"
         "要求：保留核心意思和情感，删去冗余表达，保持作者的句式风格，直接输出压缩后的文字。\n\n"
-        f"原文：{text}"
+        f"原文：{data.text.strip()}"
     )
-    try:
-        message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=512,
-            system=_assist_system(data.style_profile),
-            messages=[{"role": "user", "content": user}],
-        )
-        result = message.content[0].text.strip().strip('「」""\'').strip()
-        return {"result": result}
-    except Exception as e:
-        print(f"[assist/reduce] error: {e}")
-        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+    return _assist_call(data, user, max_tokens=512, parse_options=False)
+
+
+@app.post("/assist/synonyms")
+def assist_synonyms(data: AssistRequest):
+    user = (
+        "请为以下文字提供 3 个同义或近义的替代表达。\n"
+        "要求：保持原意，贴合上下文语境，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
+        f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
+    )
+    return _assist_call(data, user, max_tokens=300, parse_options=True)
+
+
+@app.post("/assist/metaphor")
+def assist_metaphor(data: AssistRequest):
+    user = (
+        "请为以下文字提供 2-3 个比喻表达，帮助将其意象化或更有画面感。\n"
+        "要求：比喻贴合上下文语境，避免陈词滥调，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
+        f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
+    )
+    return _assist_call(data, user, max_tokens=400, parse_options=True)
+
+
+@app.post("/assist/expand")
+def assist_expand(data: AssistRequest):
+    user = (
+        "请将以下文字扩展至约 2 倍长度。\n"
+        "要求：补充细节、感受或场景描写，自然融入原文语境，保持作者风格，直接输出扩展后的文字。\n\n"
+        f"原文：{data.text.strip()}" + _ctx_line(data.context)
+    )
+    return _assist_call(data, user, max_tokens=700, parse_options=False)
 
 
 @app.delete("/essays/{essay_id}")
