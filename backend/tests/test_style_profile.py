@@ -50,3 +50,31 @@ def test_sample_excerpts_stops_at_total_cap():
     out = main._sample_excerpts(essays, per_essay_cap=400, total_cap=800)
     # 累计到 ~800 就停，不会把 10 篇全放进来
     assert out.count("字") <= 900
+
+
+def test_parse_soul_json_plain():
+    raw = '{"soul":"偏好短句，重意象。","rationale":{"rhythm":"短","imagery":"多","emotion":"克制","diction":"书面","signature":"留白"}}'
+    out = main._parse_soul_json(raw)
+    assert out["soul"].startswith("偏好短句")
+    assert out["rationale"]["rhythm"] == "短"
+
+
+def test_parse_soul_json_with_code_fence():
+    raw = '```json\n{"soul":"x","rationale":{}}\n```'
+    out = main._parse_soul_json(raw)
+    assert out["soul"] == "x"
+    assert out["rationale"] == {}
+
+
+def test_parse_soul_json_with_surrounding_text():
+    raw = '好的，分析如下：\n{"soul":"y","rationale":{"rhythm":"短"}}\n以上。'
+    out = main._parse_soul_json(raw)
+    assert out["soul"] == "y"
+
+
+def test_parse_soul_json_fallback_on_garbage():
+    raw = '这不是 JSON，只是一段风格描述：偏好短句。'
+    out = main._parse_soul_json(raw)
+    # 兜底：soul 用原文，rationale 为空 dict，不抛异常
+    assert out["soul"] == raw.strip()
+    assert out["rationale"] == {}

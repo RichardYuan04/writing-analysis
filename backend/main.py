@@ -517,6 +517,30 @@ def _sample_excerpts(essays, per_essay_cap: int = 400, total_cap: int = 800) -> 
     return "\n\n".join(parts)
 
 
+def _parse_soul_json(raw: str) -> dict:
+    """把模型返回解析成 {soul, rationale}。容错：去 ```fence、抓首个 {..} 块；
+    彻底失败则把整段当 soul 兜底，绝不抛异常。"""
+    text = (raw or "").strip()
+    # 去掉 ```json ... ``` 围栏
+    fence = re.search(r"```(?:json)?\s*(.+?)\s*```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    # 抓第一个 { 到最后一个 } 的块
+    start, end = text.find("{"), text.rfind("}")
+    candidate = text[start:end + 1] if (start != -1 and end > start) else text
+    try:
+        data = json.loads(candidate)
+        soul = (data.get("soul") or "").strip()
+        rationale = data.get("rationale") or {}
+        if not isinstance(rationale, dict):
+            rationale = {}
+        if soul:
+            return {"soul": soul, "rationale": rationale}
+    except Exception:
+        pass
+    return {"soul": (raw or "").strip(), "rationale": {}}
+
+
 # ── 写作工具面板 ──
 # 无状态文本变换：选中一段文字 → AI 辅助。四类：缩减/同义替换/比喻/扩展。
 # style_profile 为可选；缺省时走降级分支（仅要求贴合原文与上下文，不强加风格）。
