@@ -497,6 +497,26 @@ def essay_mood_reply(essay_id: int):
     return mood
 
 
+def _sample_excerpts(essays, per_essay_cap: int = 400, total_cap: int = 800) -> str:
+    """从文章列表取未改写摘录，保留原始换行与标点（节奏不可压平）。
+    每篇至多 per_essay_cap 字，累计到 total_cap 即停。"""
+    parts = []
+    total = 0
+    for e in essays:
+        if total >= total_cap:
+            break
+        content = (e.content or "").strip()
+        if not content:
+            continue
+        snippet = content[:per_essay_cap]
+        if len(content) > per_essay_cap:
+            snippet += "…"
+        title = (getattr(e, "title", "") or "").strip() or "无题"
+        parts.append(f"【{title}】\n{snippet}")
+        total += len(snippet)
+    return "\n\n".join(parts)
+
+
 # ── 写作工具面板 ──
 # 无状态文本变换：选中一段文字 → AI 辅助。四类：缩减/同义替换/比喻/扩展。
 # style_profile 为可选；缺省时走降级分支（仅要求贴合原文与上下文，不强加风格）。
