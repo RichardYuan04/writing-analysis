@@ -29,6 +29,10 @@ def db():
             s.query(main.StyleProfile).delete()
         except Exception:
             pass
+        try:
+            s.query(main.Draft).delete()
+        except Exception:
+            pass
         s.commit()
         s.close()
     _clear()

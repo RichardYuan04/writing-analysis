@@ -79,6 +79,16 @@ class StyleProfile(Base):
     generated_at = Column(DateTime, default=datetime.now)
     user_edited = Column(Integer, default=0)     # 0/1
 
+
+class Draft(Base):
+    __tablename__ = "drafts"
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200))
+    content = Column(Text)
+    date = Column(String(10))                    # YYYY-MM-DD（用户设定的写作日期）
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now)
+
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 
@@ -827,6 +837,39 @@ def update_style_profile(req: StyleProfileUpdateRequest):
         "generated_at": row.generated_at.isoformat(),
         "user_edited": 1,
     }
+    session.close()
+    return result
+
+
+# ── 草稿箱 ──
+class DraftRequest(BaseModel):
+    title: str = ""
+    content: str
+    date: str = ""
+
+
+def _draft_dict(d) -> dict:
+    return {
+        "id": d.id,
+        "title": d.title or "",
+        "content": d.content or "",
+        "date": d.date or "",
+        "created_at": d.created_at.isoformat() if d.created_at else None,
+        "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+    }
+
+
+@app.post("/drafts")
+def create_draft(data: DraftRequest):
+    if not (data.content or "").strip():
+        raise HTTPException(status_code=400, detail="草稿内容不能为空")
+    session = Session()
+    now = datetime.now()
+    d = Draft(title=data.title or "", content=data.content, date=data.date or "",
+              created_at=now, updated_at=now)
+    session.add(d)
+    session.commit()
+    result = _draft_dict(d)
     session.close()
     return result
 
