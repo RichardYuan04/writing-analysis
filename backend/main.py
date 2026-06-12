@@ -900,6 +900,19 @@ def update_draft(draft_id: int, data: DraftRequest):
     return result
 
 
+@app.delete("/drafts/{draft_id}")
+def delete_draft(draft_id: int):
+    session = Session()
+    d = session.query(Draft).filter(Draft.id == draft_id).first()
+    if not d:
+        session.close()
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    session.delete(d)
+    session.commit()
+    session.close()
+    return {"ok": True}
+
+
 @app.delete("/essays/{essay_id}")
 def delete_essay(essay_id: int):
     session = Session()

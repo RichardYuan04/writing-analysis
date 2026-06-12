@@ -45,3 +45,16 @@ def test_update_draft(client, db):
 def test_update_draft_404(client, db):
     r = client.put("/drafts/99999", json={"title": "x", "content": "y", "date": "2026-06-12"})
     assert r.status_code == 404
+
+
+def test_delete_draft(client, db):
+    d = client.post("/drafts", json={"title": "删", "content": "删我", "date": "2026-06-12"}).json()
+    r = client.delete(f"/drafts/{d['id']}")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+    assert client.get("/drafts").json() == []
+
+
+def test_delete_draft_404(client, db):
+    r = client.delete("/drafts/99999")
+    assert r.status_code == 404
