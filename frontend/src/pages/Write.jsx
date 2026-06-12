@@ -39,6 +39,8 @@ export default function Write({ onSaved, prefill, onBack }) {
   const contentRef = useRef(null)
   const moodRef = useRef(null)
   const savingRef = useRef(false)   // 同步防重入，挡住快速连点导致的重复创建
+  const hydratedRef = useRef(false) // 首次挂载（可能正从本地恢复草稿）时不清空，避免误删
+  const [confirmClear, setConfirmClear] = useState(false)  // 站内「清空」确认框
   const [greeting] = useState(daily)
   const [quote, setQuote] = useState(() => pickQuote(null))
   const [sel, setSel] = useState(null)            // 当前选区 {start,end,text}
@@ -68,7 +70,16 @@ export default function Write({ onSaved, prefill, onBack }) {
   // 无感自动保存（节流写 localStorage），不打断输入
   useEffect(() => {
     if (mood) return                       // 已保存、展示心绪卡时不再写草稿
-    if (!title && !content) return
+    if (!title && !content) {
+      // 内容被清空（删到空）：复位状态并清掉本地草稿，回到「尚未开始」。
+      // 首次挂载时可能正从 localStorage 恢复草稿（恢复 effect 已读到内存里），
+      // 这一跑不要清，否则会把刚恢复的草稿误删。
+      if (!hydratedRef.current) { hydratedRef.current = true; return }
+      setAutoState('idle'); setAutoAt('')
+      localStorage.removeItem(DRAFT_KEY)
+      return
+    }
+    hydratedRef.current = true
     setAutoState('saving')
     const t = setTimeout(() => {
       const at = new Date().toTimeString().slice(0, 5)
@@ -142,10 +153,13 @@ export default function Write({ onSaved, prefill, onBack }) {
     setTimeout(() => contentRef.current?.focus(), 0)
   }
 
-  // 清空当前编辑器（带确认）；不影响草稿箱里已存的草稿
-  const clearEditor = () => {
+  // 清空当前编辑器：先弹站内确认框；不影响草稿箱里已存的草稿
+  const requestClear = () => {
     if (!title && !content) return
-    if (!window.confirm('清空当前内容？此操作不影响已存入草稿箱的草稿。')) return
+    setConfirmClear(true)
+  }
+  const doClear = () => {
+    setConfirmClear(false)
     setTitle('')
     setContent('')
     setDate(today)
@@ -153,9 +167,17 @@ export default function Write({ onSaved, prefill, onBack }) {
     setSel(null)
     setUndoStack([])
     setMood(null)
-    setAutoState('idle')
+    setAutoState('idle'); setAutoAt('')
     localStorage.removeItem(DRAFT_KEY)
   }
+
+  // 确认框打开时支持 Esc 关闭
+  useEffect(() => {
+    if (!confirmClear) return
+    const onKey = (e) => { if (e.key === 'Escape') setConfirmClear(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [confirmClear])
 
   const handleSave = async () => {
     if (savingRef.current || mood) return   // 防重入 + 已保存(卡片已出)不再创建
@@ -239,7 +261,7 @@ export default function Write({ onSaved, prefill, onBack }) {
           <span className="saved-flag">已保存 ✓</span>
         ) : (
           <>
-            <button className="clear-btn" onClick={clearEditor} disabled={!title && !content}>清空</button>
+            <button className="clear-btn" onClick={requestClear} disabled={!title && !content}>清空</button>
             <button className="save-btn" onClick={handleSave} disabled={saving}>
               {saving ? '保存中…' : '保存'}
             </button>
@@ -277,6 +299,19 @@ export default function Write({ onSaved, prefill, onBack }) {
           onToggle={() => setDraftPanelCollapsed(c => !c)}
         />
       </div>
+
+      {confirmClear && (
+        <div className="modal-overlay" onClick={() => setConfirmClear(false)}>
+          <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">清空当前内容？</div>
+            <p className="modal-msg">编辑区里的标题和正文会被清掉，回到「尚未开始」。<br />此操作不影响已存入草稿箱的草稿。</p>
+            <div className="modal-acts">
+              <button className="modal-ghost" onClick={() => setConfirmClear(false)}>取消</button>
+              <button className="modal-primary" onClick={doClear} autoFocus>清空</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
