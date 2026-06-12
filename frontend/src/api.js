@@ -57,3 +57,8 @@ export const listFragments = (category, hiddenOnly = false) => {
 }
 export const listThemes = () => api.get('/vault/themes')
 export const updateFragmentFeedback = (id, data) => api.patch(`/vault/fragments/${id}`, data)
+
+export const listDrafts = () => api.get('/drafts')
+export const createDraft = (data) => api.post('/drafts', data)
+export const updateDraft = (id, data) => api.put(`/drafts/${id}`, data)
+export const deleteDraft = (id) => api.delete(`/drafts/${id}`)
