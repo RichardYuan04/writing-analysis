@@ -883,6 +883,23 @@ def list_drafts():
     return result
 
 
+@app.put("/drafts/{draft_id}")
+def update_draft(draft_id: int, data: DraftRequest):
+    session = Session()
+    d = session.query(Draft).filter(Draft.id == draft_id).first()
+    if not d:
+        session.close()
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    d.title = data.title or ""
+    d.content = data.content
+    d.date = data.date or ""
+    d.updated_at = datetime.now()
+    session.commit()
+    result = _draft_dict(d)
+    session.close()
+    return result
+
+
 @app.delete("/essays/{essay_id}")
 def delete_essay(essay_id: int):
     session = Session()

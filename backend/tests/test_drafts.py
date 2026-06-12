@@ -30,3 +30,18 @@ def test_list_drafts_empty(client, db):
     r = client.get("/drafts")
     assert r.status_code == 200
     assert r.json() == []
+
+
+def test_update_draft(client, db):
+    d = client.post("/drafts", json={"title": "原", "content": "原内容", "date": "2026-06-12"}).json()
+    r = client.put(f"/drafts/{d['id']}", json={"title": "改", "content": "改后内容", "date": "2026-06-12"})
+    assert r.status_code == 200
+    assert r.json()["title"] == "改"
+    assert r.json()["content"] == "改后内容"
+    got = client.get("/drafts").json()
+    assert got[0]["content"] == "改后内容"  # 持久化生效
+
+
+def test_update_draft_404(client, db):
+    r = client.put("/drafts/99999", json={"title": "x", "content": "y", "date": "2026-06-12"})
+    assert r.status_code == 404
