@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { createEssay, moodReply } from '../api'
+import { createEssay, moodReply, deleteDraft } from '../api'
 import MoodCard from '../components/MoodCard'
 import AssistPanel from '../components/AssistPanel'
+import DraftPanel from '../components/DraftPanel'
 import QUOTES from '../data/quotes'
 
 const DRAFT_KEY = 'wt_write_draft'
@@ -43,6 +44,8 @@ export default function Write({ onSaved, prefill, onBack }) {
   const [sel, setSel] = useState(null)            // 当前选区 {start,end,text}
   const [panelCollapsed, setPanelCollapsed] = useState(false)
   const [undoStack, setUndoStack] = useState([])  // 替换前整篇正文快照栈
+  const [draftId, setDraftId] = useState(null)            // 当前正在编辑的草稿 id
+  const [draftPanelCollapsed, setDraftPanelCollapsed] = useState(false)
 
   // 初始化：prefill（来自仓库）优先；否则尝试恢复本地草稿
   useEffect(() => {
@@ -126,6 +129,34 @@ export default function Write({ onSaved, prefill, onBack }) {
     })
   }
 
+  // 点开草稿箱里的某份 → 载入编辑器继续写
+  const openDraft = (d) => {
+    setTitle(d.title || '')
+    setContent(d.content || '')
+    setDate(d.date || today)
+    setDraftId(d.id)
+    setMood(null)
+    setSel(null)
+    setUndoStack([])
+    setAutoState('saved')
+    setTimeout(() => contentRef.current?.focus(), 0)
+  }
+
+  // 清空当前编辑器（带确认）；不影响草稿箱里已存的草稿
+  const clearEditor = () => {
+    if (!title && !content) return
+    if (!window.confirm('清空当前内容？此操作不影响已存入草稿箱的草稿。')) return
+    setTitle('')
+    setContent('')
+    setDate(today)
+    setDraftId(null)
+    setSel(null)
+    setUndoStack([])
+    setMood(null)
+    setAutoState('idle')
+    localStorage.removeItem(DRAFT_KEY)
+  }
+
   const handleSave = async () => {
     if (savingRef.current || mood) return   // 防重入 + 已保存(卡片已出)不再创建
     if (!title.trim() || !content.trim()) { setError('标题和内容不能为空'); return }
@@ -134,6 +165,7 @@ export default function Write({ onSaved, prefill, onBack }) {
     try {
       const res = await createEssay({ title, content, date })
       localStorage.removeItem(DRAFT_KEY)
+      if (draftId) { try { await deleteDraft(draftId) } catch { /* ignore */ } setDraftId(null) }
       // 后端旧版/未返回心绪卡时，退回原行为（保存后离开），不渲染空卡
       if (!res.data.mood_card || !res.data.mood_card.tone) { onSaved(); return }
       setMood({ id: res.data.id, ...res.data.mood_card })
@@ -206,9 +238,12 @@ export default function Write({ onSaved, prefill, onBack }) {
         {mood ? (
           <span className="saved-flag">已保存 ✓</span>
         ) : (
-          <button className="save-btn" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中…' : '保存'}
-          </button>
+          <>
+            <button className="clear-btn" onClick={clearEditor} disabled={!title && !content}>清空</button>
+            <button className="save-btn" onClick={handleSave} disabled={saving}>
+              {saving ? '保存中…' : '保存'}
+            </button>
+          </>
         )}
       </div>
 
@@ -223,14 +258,25 @@ export default function Write({ onSaved, prefill, onBack }) {
       )}
       </div>
 
-      <AssistPanel
-        sel={sel}
-        collapsed={panelCollapsed}
-        onToggle={() => setPanelCollapsed(c => !c)}
-        onApply={applyAssist}
-        onUndo={undoLast}
-        canUndo={undoStack.length > 0}
-      />
+      <div className="write-right">
+        <AssistPanel
+          sel={sel}
+          collapsed={panelCollapsed}
+          onToggle={() => setPanelCollapsed(c => !c)}
+          onApply={applyAssist}
+          onUndo={undoLast}
+          canUndo={undoStack.length > 0}
+        />
+        <DraftPanel
+          current={{ title, content, date }}
+          draftId={draftId}
+          onSaved={(d) => setDraftId(d.id)}
+          onOpen={openDraft}
+          onDraftRemoved={() => setDraftId(null)}
+          collapsed={draftPanelCollapsed}
+          onToggle={() => setDraftPanelCollapsed(c => !c)}
+        />
+      </div>
     </div>
   )
 }
