@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Overview from './pages/Overview'
 import Write from './pages/Write'
 import EssayDetail from './pages/EssayDetail'
@@ -10,6 +10,13 @@ export default function App() {
   const [page, setPage] = useState('overview')
   const [selectedId, setSelectedId] = useState(null)
   const [writePrefill, setWritePrefill] = useState(null)
+  const [theme, setTheme] = useState(() => localStorage.getItem('wtm-theme') || 'dark')
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('wtm-theme', theme)
+  }, [theme])
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
   const navigate = (p, id = null) => {
     setPage(p)
@@ -24,12 +31,15 @@ export default function App() {
   return (
     <div className="app">
       <nav className="nav">
-        <span className="nav-logo">✍️ 文字时光机</span>
+        <span className="nav-logo">文字时光机</span>
         <div className="nav-links">
           <button className={page === 'overview' ? 'active' : ''} onClick={() => navigate('overview')}>总览</button>
           <button className={page === 'portrait' ? 'active' : ''} onClick={() => navigate('portrait')}>写作画像</button>
           <button className={page === 'vault' ? 'active' : ''} onClick={() => navigate('vault')}>半成品仓库</button>
           <button className={page === 'write' ? 'active' : ''} onClick={() => navigateToWrite()}>写作</button>
+          <button className="theme-toggle" onClick={toggleTheme} title="切换明暗">
+            {theme === 'dark' ? '☀ 白昼' : '☾ 夜晚'}
+          </button>
         </div>
       </nav>
 

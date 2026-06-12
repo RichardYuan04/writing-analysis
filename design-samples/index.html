@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>文字时光机 · 设计方向样例</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Noto+Serif+SC:wght@400;600;700;900&family=Spectral:ital,wght@0,300;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#13110e; --panel:#1c1916; --line:#2e2823; --ink:#ece4d6; --dim:#9a8d79; --gold:#c9a05a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #221d18 0%, var(--bg) 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'Spectral',Georgia,serif;
+    min-height:100vh;
+    padding:72px 24px 96px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  .kicker{
+    font-family:'Fraunces',serif;font-style:italic;letter-spacing:.04em;
+    color:var(--gold);font-size:15px;margin-bottom:14px;opacity:0;
+    animation:rise .8s .1s cubic-bezier(.2,.8,.2,1) forwards;
+  }
+  h1{
+    font-family:'Noto Serif SC',serif;font-weight:900;font-size:clamp(40px,7vw,76px);
+    line-height:1.02;letter-spacing:-.01em;margin-bottom:8px;opacity:0;
+    animation:rise .9s .2s cubic-bezier(.2,.8,.2,1) forwards;
+  }
+  h1 em{font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--gold)}
+  .lede{
+    max-width:560px;color:var(--dim);font-size:17px;line-height:1.7;margin:18px 0 8px;opacity:0;
+    animation:rise .9s .32s cubic-bezier(.2,.8,.2,1) forwards;
+  }
+  .meta{font-family:'Fraunces',serif;font-size:13px;color:var(--dim);letter-spacing:.06em;
+    text-transform:uppercase;margin-bottom:48px;opacity:0;animation:rise .9s .42s forwards;}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  a.card{
+    display:block;text-decoration:none;color:inherit;position:relative;overflow:hidden;
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:30px 30px 26px;transition:transform .5s cubic-bezier(.2,.8,.2,1),border-color .4s,box-shadow .5s;
+    opacity:0;animation:rise .9s forwards;
+  }
+  a.card:nth-child(1){animation-delay:.5s}
+  a.card:nth-child(2){animation-delay:.6s}
+  a.card:nth-child(3){animation-delay:.7s}
+  a.card:nth-child(4){animation-delay:.8s}
+  a.card:hover{transform:translateY(-6px);border-color:var(--gold);box-shadow:0 24px 48px -24px rgba(0,0,0,.7)}
+  .num{font-family:'Fraunces',serif;font-size:14px;color:var(--gold);letter-spacing:.1em}
+  .ctitle{font-family:'Noto Serif SC',serif;font-weight:700;font-size:25px;margin:10px 0 6px}
+  .cen{font-family:'Fraunces',serif;font-style:italic;font-size:15px;color:var(--dim);margin-bottom:14px}
+  .cdesc{color:var(--dim);font-size:14.5px;line-height:1.75}
+  .swatch{display:flex;gap:6px;margin-top:18px}
+  .swatch i{width:30px;height:14px;border-radius:3px;display:block}
+  .arrow{position:absolute;top:28px;right:28px;font-family:'Fraunces',serif;font-size:20px;color:var(--line);transition:color .4s,transform .4s}
+  a.card:hover .arrow{color:var(--gold);transform:translate(4px,-4px)}
+  .foot{margin-top:54px;color:var(--dim);font-size:13.5px;line-height:1.8;opacity:0;animation:rise .9s .95s forwards}
+  @keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="kicker">Design Exploration · 四种方向</div>
+    <h1>文字时光机<br><em>which soul</em> 该是哪一个？</h1>
+    <p class="lede">同一套真实内容，四种截然不同的气质。每个样例都支持 明 / 暗 主题切换、中英混排、叙事化进场动效。点开慢慢看，挑一个，或告诉我把哪几样融合。</p>
+    <div class="meta">Tap a card · 右上角可切换明暗</div>
+
+    <div class="grid">
+      <a class="card" href="./01-editorial.html">
+        <span class="arrow">↗</span>
+        <div class="num">01</div>
+        <div class="ctitle">文学杂志 · 编辑感</div>
+        <div class="cen">The Editorial</div>
+        <div class="cdesc">大号衬线标题、强烈字号对比、不对称排版、细线分割、大量留白。优雅克制，一眼就是「被设计过」的高级感。</div>
+        <div class="swatch"><i style="background:#f4efe6"></i><i style="background:#1a1a1a"></i><i style="background:#c8442b"></i></div>
+      </a>
+      <a class="card" href="./02-vintage.html">
+        <span class="arrow">↗</span>
+        <div class="num">02</div>
+        <div class="ctitle">复古时光 · 怀旧暖调</div>
+        <div class="cen">The Archive</div>
+        <div class="cdesc">做旧纸纹、老照片色调、打字机字体、票根与邮戳质感。把「时光机」的时间叙事拉满，像翻一本旧日记。</div>
+        <div class="swatch"><i style="background:#e8dcc4"></i><i style="background:#3d3328"></i><i style="background:#9c5a3c"></i></div>
+      </a>
+      <a class="card" href="./03-serene.html">
+        <span class="arrow">↗</span>
+        <div class="num">03</div>
+        <div class="ctitle">静谧极简 · 禅意</div>
+        <div class="cen">The Quiet</div>
+        <div class="cdesc">近乎单色、超大留白、精确网格、几乎无装饰。让文字本身成为唯一主角。日式 / 瑞士风的冷静。</div>
+        <div class="swatch"><i style="background:#fafafa"></i><i style="background:#111"></i><i style="background:#8a8a8a"></i></div>
+      </a>
+      <a class="card" href="./04-nocturne.html">
+        <span class="arrow">↗</span>
+        <div class="num">04</div>
+        <div class="ctitle">深色沉浸 · 夜晚书写</div>
+        <div class="cen">The Nocturne</div>
+        <div class="cdesc">墨黑 / 午夜蓝背景，暖光点缀，像深夜独自写作的氛围。降低视觉噪音，专注感强，情绪化的光影。</div>
+        <div class="swatch"><i style="background:#12141c"></i><i style="background:#e9c46a"></i><i style="background:#6d8aa8"></i></div>
+      </a>
+      <a class="card" href="./05-warm-lamp.html">
+        <span class="arrow">↗</span>
+        <div class="num">05 · NEW</div>
+        <div class="ctitle">深夜书桌 · 暖光台灯</div>
+        <div class="cen">The Warm Lamp</div>
+        <div class="cdesc">04 的卡片骨架 + 暖咖啡黑底 + 一盏聚焦的橘色台灯光晕。私密、专注，「深夜一盏灯」的书写氛围。</div>
+        <div class="swatch"><i style="background:#17110b"></i><i style="background:#e89b50"></i><i style="background:#f3c781"></i></div>
+      </a>
+      <a class="card" href="./06-dusk-bookstore.html">
+        <span class="arrow">↗</span>
+        <div class="num">06 · NEW</div>
+        <div class="ctitle">黄昏书店 · 弥漫暖光</div>
+        <div class="cen">The Dusk Bookstore</div>
+        <div class="cdesc">04 的卡片骨架 + 更亮的暖棕 + 整屋弥漫的蜂蜜金光，含极淡暖颗粒。像浸在橘色灯光里的旧书店，松弛包裹。</div>
+        <div class="swatch"><i style="background:#221710"></i><i style="background:#f0a85a"></i><i style="background:#ffd28a"></i></div>
+      </a>
+    </div>
+
+    <p class="foot">这一页本身用的是「深色沉浸」基调，作为第 5 种参考。<br>看完告诉我：选哪个，或者「01 的排版 + 02 的色调 + 04 的暗色」这样混搭也完全可以。</p>
+  </div>
+</body>
+</html>

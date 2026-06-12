@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>02 · 复古时光 / 怀旧暖调 — 文字时光机</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Noto+Serif+SC:wght@400;500;600;700;900&family=Spectral:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="light"]{
+    --paper:#e7dabf; --paper2:#ddcfb0; --card:#f1e7d2; --ink:#3a3225; --ink2:#6b5e48;
+    --dim:#9a8a6c; --line:#c8b790; --stamp:#9c4a2c; --stamp2:#a8763a; --teal:#5f7a6e;
+  }
+  :root[data-theme="dark"]{
+    --paper:#23201a; --paper2:#1d1a15; --card:#2a261e; --ink:#e8dcc2; --ink2:#c2b291;
+    --dim:#8e7f63; --line:#473f2f; --stamp:#cf6a45; --stamp2:#cf9a4f; --teal:#84a394;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);color:var(--ink);font-family:'Spectral',Georgia,serif;
+    line-height:1.7;-webkit-font-smoothing:antialiased;transition:background .5s,color .5s;
+    position:relative;overflow-x:hidden;min-height:100vh;
+  }
+  /* 做旧纸纹 + 噪点 */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;mix-blend-mode:multiply;opacity:.5;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(120,90,40,.16), transparent 36%),
+      radial-gradient(circle at 86% 78%, rgba(90,60,30,.18), transparent 40%),
+      repeating-linear-gradient(0deg, rgba(120,90,40,.035) 0 2px, transparent 2px 5px);}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.35;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");}
+  [data-theme="dark"] body::before{mix-blend-mode:screen;opacity:.25}
+  ::selection{background:var(--stamp);color:#f1e7d2}
+  main,nav{position:relative;z-index:3}
+
+  nav{display:flex;align-items:center;justify-content:space-between;
+    padding:20px clamp(18px,5vw,56px);border-bottom:2px double var(--line)}
+  .logo{font-family:'Noto Serif SC',serif;font-weight:900;font-size:19px;display:flex;align-items:center;gap:12px}
+  .logo .pm{font-family:'Special Elite',monospace;border:1.5px solid var(--stamp);color:var(--stamp);
+    font-size:10px;padding:3px 7px;border-radius:3px;transform:rotate(-6deg);letter-spacing:.05em}
+  .links{display:flex;gap:8px;align-items:center;font-family:'Special Elite',monospace;font-size:13.5px}
+  .links a{color:var(--ink2);text-decoration:none;padding:6px 12px;border-radius:3px;transition:all .25s;cursor:pointer}
+  .links a:hover,.links a.on{color:var(--stamp);background:color-mix(in srgb,var(--stamp) 12%,transparent)}
+  .toggle{font-family:'Special Elite',monospace;font-size:12px;border:1.5px dashed var(--line);
+    background:none;color:var(--ink2);padding:7px 13px;border-radius:3px;cursor:pointer;transition:all .25s;margin-left:8px}
+  .toggle:hover{border-color:var(--stamp);color:var(--stamp)}
+
+  main{max-width:920px;margin:0 auto;padding:0 clamp(18px,5vw,56px)}
+
+  .rise{opacity:0;transform:translateY(20px);animation:rise .9s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  /* 票根刊头 */
+  .stub{margin:48px 0 12px;display:grid;grid-template-columns:1fr 150px;background:var(--card);
+    border:1.5px solid var(--line);border-radius:6px;overflow:hidden;
+    box-shadow:0 10px 30px -18px rgba(60,40,20,.6)}
+  @media(max-width:640px){.stub{grid-template-columns:1fr}}
+  .stub .body{padding:34px 36px}
+  .stub .perf{border-left:2px dashed var(--line);padding:26px 18px;text-align:center;
+    background:repeating-linear-gradient(0deg,transparent 0 14px,color-mix(in srgb,var(--line) 30%,transparent) 14px 15px)}
+  .ticket-k{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+  .quote{font-family:'Noto Serif SC',serif;font-weight:700;font-size:clamp(26px,4.4vw,40px);line-height:1.3;margin:14px 0 10px}
+  .quote em{color:var(--stamp);font-style:italic}
+  .cite{font-family:'Special Elite',monospace;font-size:13px;color:var(--ink2)}
+  .stamp{width:80px;height:84px;margin:0 auto 10px;border:2px solid var(--stamp);border-radius:6px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--stamp);
+    transform:rotate(-7deg);
+    -webkit-mask:radial-gradient(circle 3px at 3px 3px,transparent 96%,#000) -3px -3px/12px 12px;}
+  .stamp .yr{font-family:'Special Elite',monospace;font-size:22px;line-height:1}
+  .stamp .mo{font-family:'Special Elite',monospace;font-size:10px;letter-spacing:.1em;margin-top:3px}
+  .perf .no{font-family:'Special Elite',monospace;font-size:12px;color:var(--dim);margin-top:6px}
+
+  /* 数据：老式计数器 */
+  .stats{display:flex;gap:14px;margin:30px 0 8px;flex-wrap:wrap}
+  .stat{flex:1;min-width:150px;background:var(--card);border:1.5px solid var(--line);border-radius:5px;padding:18px 20px;position:relative}
+  .stat::before{content:"●";position:absolute;top:8px;right:10px;color:var(--line);font-size:9px}
+  .stat .n{font-family:'Special Elite',monospace;font-size:38px;line-height:1;color:var(--ink)}
+  .stat .n span{color:var(--stamp);font-size:.5em}
+  .stat .l{font-family:'Noto Serif SC',serif;color:var(--ink2);font-size:13.5px;margin-top:8px}
+
+  .sec{margin:54px 0 22px;display:flex;align-items:center;gap:14px}
+  .sec h2{font-family:'Noto Serif SC',serif;font-weight:700;font-size:23px}
+  .sec .tag{font-family:'Special Elite',monospace;font-size:11px;color:#f1e7d2;background:var(--stamp);
+    padding:3px 10px;border-radius:3px;letter-spacing:.08em;transform:rotate(-2deg)}
+  .sec .rule{flex:1;border-top:2px dotted var(--line)}
+
+  /* 灵魂词 = 旧标签 */
+  .souls{display:flex;flex-wrap:wrap;gap:12px}
+  .sw{font-family:'Noto Serif SC',serif;font-weight:600;font-size:16px;color:var(--ink);
+    background:var(--card);border:1.5px solid var(--line);padding:7px 16px;border-radius:40px;
+    text-decoration:none;display:inline-flex;align-items:center;gap:7px;opacity:0;
+    animation:swin .6s cubic-bezier(.2,.8,.2,1) forwards;transition:all .25s;cursor:pointer}
+  .sw::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--stamp2)}
+  .sw:hover{border-color:var(--stamp);color:var(--stamp);transform:translateY(-2px) rotate(-1.5deg)}
+  @keyframes swin{from{opacity:0;transform:translateY(12px) rotate(3deg)}to{opacity:1;transform:none}}
+
+  /* 随笔 = 照片卡 / 卷宗 */
+  .essays{display:flex;flex-direction:column;gap:14px}
+  .essay{display:grid;grid-template-columns:64px 1fr auto;gap:20px;align-items:center;
+    background:var(--card);border:1.5px solid var(--line);border-radius:5px;padding:16px 20px;
+    text-decoration:none;color:inherit;transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;cursor:pointer}
+  .essay:hover{transform:rotate(-.4deg) translateY(-3px);box-shadow:0 14px 30px -18px rgba(60,40,20,.7)}
+  .essay .cal{text-align:center;font-family:'Special Elite',monospace;border:1.5px solid var(--line);border-radius:4px;padding:6px 0;background:var(--paper)}
+  .essay .cal b{display:block;font-size:24px;line-height:1;color:var(--ink)}
+  .essay .cal i{font-size:10px;font-style:normal;color:var(--stamp);letter-spacing:.06em}
+  .essay .ti{font-family:'Noto Serif SC',serif;font-weight:600;font-size:18.5px}
+  .essay .pv{color:var(--ink2);font-size:14px;margin-top:4px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .essay .mark{font-family:'Special Elite',monospace;font-size:11px;color:var(--dim);white-space:nowrap;
+    border:1.5px dashed var(--line);padding:4px 9px;border-radius:3px;transform:rotate(3deg)}
+  .essay:hover .mark{color:var(--stamp);border-color:var(--stamp)}
+
+  footer{margin:70px 0 56px;padding-top:22px;border-top:2px double var(--line);
+    font-family:'Special Elite',monospace;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+</style>
+</head>
+<body>
+  <nav>
+    <div class="logo">文字时光机 <span class="pm">EST. 2026</span></div>
+    <div class="links">
+      <a class="on">总览</a><a>写作画像</a><a>仓库</a><a>写作</a>
+      <button class="toggle" onclick="tt()">明 / 暗 ☾</button>
+    </div>
+  </nav>
+
+  <main>
+    <!-- 票根 -->
+    <section class="stub rise">
+      <div class="body">
+        <div class="ticket-k">Daily Question · 今日一问</div>
+        <div class="quote">我们写下的每一个字，<br>都是寄给<em>未来自己</em>的信。</div>
+        <div class="cite">＞ 你最近一次，为什么而停笔？</div>
+      </div>
+      <div class="perf">
+        <div class="stamp"><div class="yr">'26</div><div class="mo">JUN</div></div>
+        <div class="ticket-k">Admit One</div>
+        <div class="no">№ 0128</div>
+      </div>
+    </section>
+
+    <!-- 计数器 -->
+    <section class="stats">
+      <div class="stat rise" style="animation-delay:.1s"><div class="n">128<span>篇</span></div><div class="l">累计随笔</div></div>
+      <div class="stat rise" style="animation-delay:.18s"><div class="n">96,400<span>字</span></div><div class="l">总字数</div></div>
+      <div class="stat rise" style="animation-delay:.26s"><div class="n">23<span>天</span></div><div class="l">连续写作</div></div>
+    </section>
+
+    <!-- 画像 -->
+    <div class="sec"><h2>写作画像</h2><span class="tag">SOUL</span><span class="rule"></span></div>
+    <section class="souls" id="souls"></section>
+
+    <!-- 随笔 -->
+    <div class="sec"><h2>近期卷宗</h2><span class="tag">ARCHIVE</span><span class="rule"></span></div>
+    <section class="essays">
+      <a class="essay rise" style="animation-delay:.1s"><div class="cal"><b>11</b><i>JUN</i></div><div><div class="ti">海边那家旧书店还开着</div><div class="pv">绕过防波堤的时候，风把书页吹得哗哗响，像有人替我读那些没读完的句子。</div></div><div class="mark">1,240 字</div></a>
+      <a class="essay rise" style="animation-delay:.18s"><div class="cal"><b>09</b><i>JUN</i></div><div><div class="ti">关于沉默的几种用法</div><div class="pv">母亲不说话的时候最响。我学了很多年才听懂那种安静里的叮嘱。</div></div><div class="mark">860 字</div></a>
+      <a class="essay rise" style="animation-delay:.26s"><div class="cal"><b>05</b><i>JUN</i></div><div><div class="ti">黄昏是一天里最诚实的时刻</div><div class="pv">光开始撤退，影子拉得很长，所有白天撑住的东西都在这一刻松了手。</div></div><div class="mark">1,510 字</div></a>
+      <a class="essay rise" style="animation-delay:.34s"><div class="cal"><b>01</b><i>JUN</i></div><div><div class="ti">远方其实是一种借口</div><div class="pv">我们说想去远方，多半只是不想待在此刻。</div></div><div class="mark">640 字</div></a>
+    </section>
+
+    <footer><span>文字时光机 · 怀旧暖调 / The Archive 方向样例</span><span>Set in Special Elite &amp; Noto Serif SC</span></footer>
+  </main>
+
+<script>
+  const words=["孤独","海","黄昏","母亲","远方","沉默","光","旧时","潮汐","信"];
+  const c=document.getElementById('souls');
+  words.forEach((w,i)=>{const a=document.createElement('a');a.className='sw';a.href='#';
+    a.textContent=w;a.style.animationDelay=(.1+i*.07)+'s';c.appendChild(a);});
+  function tt(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='light'?'dark':'light';}
+</script>
+</body>
+</html>

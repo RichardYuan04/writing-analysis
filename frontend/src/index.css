@@ -1,29 +1,117 @@
-:root {
-  --bg: #F7F4EF;
-  --bg-card: #FFFFFF;
-  --text-primary: #2C2C2C;
-  --text-secondary: #8A7F74;
-  --text-hint: #B5A898;
-  --accent: #8B6F47;
-  --accent-light: #C9B99A;
-  --border: #E8E0D5;
-  --sentiment-positive: #8B6F47;
-  --sentiment-negative: #7A8FA6;
-  --sentiment-neutral: #C9B99A;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+/* ─────────────────────────────────────────────
+   文字时光机 · 暖光双主题 (Warm Lamp)
+   默认深色「深夜书桌」，可切「白昼」暖米色
+   旧变量名全部保留，旧规则无需改动即可继承新色
+   ───────────────────────────────────────────── */
+
+:root,
+:root[data-theme="dark"] {
+  /* 背景层次 */
+  --bg: #17110b;
+  --bg2: #1e1610;
+  --panel: #241a11;
+  --panel2: #1b130c;
+  --bg-card: #241a11;
+
+  /* 文字 */
+  --text-primary: #f1e7d6;
+  --text-secondary: #c6b39a;
+  --text-hint: #8c7560;
+
+  /* 暖光强调色 */
+  --accent: #e89b50;        /* 橘色台灯 */
+  --accent-light: #f3c781;  /* 蜂蜜金 */
+  --honey: #f3c781;
+  --on-accent: #1a130c;     /* 暖色按钮上的文字（深色主题用近黑） */
+  --border: #3a2c1d;
+  --border-soft: #2e2317;
+
+  /* 光晕 */
+  --glow: rgba(232, 155, 80, 0.22);
+  --glow2: rgba(243, 199, 129, 0.10);
+
+  /* 情绪色 */
+  --sentiment-positive: #e89b50;
+  --sentiment-negative: #7c9cc0;
+  --sentiment-neutral: #9c8568;
+
+  /* 卡片渐变 + 阴影 */
+  --card-grad: linear-gradient(160deg, var(--panel), var(--panel2));
+  --shadow-card: 0 22px 44px -28px rgba(0, 0, 0, 0.85);
+  --shadow-glow: 0 0 36px -22px var(--glow);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --font-display: 'Fraunces', Georgia, serif;
   --font-serif: 'Noto Serif SC', Georgia, serif;
-  --font-sans: 'PingFang SC', -apple-system, sans-serif;
+  --font-sans: 'Spectral', 'PingFang SC', -apple-system, system-ui, sans-serif;
+}
+
+:root[data-theme="light"] {
+  --bg: #f4ebdd;
+  --bg2: #fbf5ea;
+  --panel: #fffdf7;
+  --panel2: #fbf4e8;
+  --bg-card: #fffdf7;
+
+  --text-primary: #2a2015;
+  --text-secondary: #6c5945;
+  --text-hint: #a8927b;
+
+  --accent: #c87a2e;
+  --accent-light: #b07d28;
+  --honey: #b07d28;
+  --on-accent: #fffdf7;
+  --border: #e6d8c2;
+  --border-soft: #efe4d2;
+
+  --glow: rgba(200, 122, 46, 0.14);
+  --glow2: rgba(176, 125, 40, 0.07);
+
+  --sentiment-positive: #c87a2e;
+  --sentiment-negative: #5f7a96;
+  --sentiment-neutral: #b3a085;
+
+  --card-grad: linear-gradient(160deg, var(--panel), var(--panel2));
+  --shadow-card: 0 18px 40px -28px rgba(90, 60, 25, 0.4);
+  --shadow-glow: 0 0 30px -20px var(--glow);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
 
 body {
   font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+  transition: background 0.6s, color 0.6s;
+  position: relative;
+  min-height: 100vh;
 }
 
-#root { min-height: 100vh; }
+/* 一盏台灯：聚焦的橘色光晕从顶部洒下，四周渐暗 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.6s;
+  background:
+    radial-gradient(46% 38% at 50% -8%, var(--glow), transparent 72%),
+    radial-gradient(34% 30% at 82% 16%, var(--glow2), transparent 70%),
+    radial-gradient(130% 100% at 50% 132%, rgba(0, 0, 0, 0.42), transparent 55%);
+}
+:root[data-theme="light"] body::before {
+  background:
+    radial-gradient(50% 40% at 50% -10%, var(--glow), transparent 72%),
+    radial-gradient(34% 30% at 84% 16%, var(--glow2), transparent 70%);
+}
+
+::selection { background: var(--accent); color: var(--bg); }
+
+#root { min-height: 100vh; position: relative; z-index: 1; }

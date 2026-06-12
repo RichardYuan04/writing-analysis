@@ -136,7 +136,7 @@ export default function EssayDetail({ id, onBack }) {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#6c63ff" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </section>
@@ -188,11 +188,11 @@ function EmotionBreakdown({ detail }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
         {sorted.map(({ key, label, val, color }) => (
           <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 42, fontSize: 12, color: '#888', textAlign: 'right', flexShrink: 0 }}>{label}</span>
-            <div style={{ flex: 1, background: '#f0ebe3', borderRadius: 4, height: 10, overflow: 'hidden' }}>
+            <span style={{ width: 42, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>{label}</span>
+            <div style={{ flex: 1, background: 'var(--border-soft)', borderRadius: 4, height: 10, overflow: 'hidden' }}>
               <div style={{ width: `${val}%`, background: color, height: '100%', borderRadius: 4, transition: 'width 0.4s ease' }} />
             </div>
-            <span style={{ width: 36, fontSize: 12, color: '#888', flexShrink: 0 }}>{val}%</span>
+            <span style={{ width: 36, fontSize: 12, color: 'var(--text-secondary)', flexShrink: 0, fontFamily: 'var(--font-display)' }}>{val}%</span>
           </div>
         ))}
       </div>

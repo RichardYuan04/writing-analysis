@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>01 · 文学杂志 / 编辑感 — 文字时光机</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,400&family=Noto+Serif+SC:wght@400;500;600;700;900&family=Spectral:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="light"]{
+    --bg:#f4efe6; --bg2:#ece5d7; --panel:#fbf8f1; --ink:#1a1815; --ink2:#5c574d;
+    --dim:#8d8475; --line:#ddd3c2; --line2:#c9bda7; --accent:#c8442b; --accent-soft:#f0d6cb;
+  }
+  :root[data-theme="dark"]{
+    --bg:#15130f; --bg2:#1b1813; --panel:#1f1b15; --ink:#f1eae0; --ink2:#bdb3a2;
+    --dim:#8d8474; --line:#2f2a22; --line2:#413a2f; --accent:#e0664c; --accent-soft:#3a201a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);color:var(--ink);font-family:'Spectral',Georgia,serif;
+    -webkit-font-smoothing:antialiased;transition:background .5s,color .5s;
+    line-height:1.6;overflow-x:hidden;
+  }
+  ::selection{background:var(--accent);color:#fff}
+
+  /* ── 顶栏 ── */
+  nav{
+    display:flex;align-items:baseline;justify-content:space-between;
+    padding:24px clamp(20px,5vw,64px);border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);z-index:20;
+  }
+  .logo{font-family:'Noto Serif SC',serif;font-weight:900;font-size:19px;letter-spacing:.02em}
+  .logo small{font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--accent);font-size:13px;margin-left:8px;letter-spacing:.04em}
+  .links{display:flex;gap:26px;align-items:center}
+  .links a{font-family:'Fraunces',serif;font-size:14px;color:var(--ink2);text-decoration:none;position:relative;transition:color .3s}
+  .links a span{display:block;font-size:11px;color:var(--dim);font-style:italic}
+  .links a:hover,.links a.on{color:var(--accent)}
+  .links a.on::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--accent)}
+  .toggle{
+    border:1px solid var(--line2);background:none;color:var(--ink2);cursor:pointer;
+    font-family:'Fraunces',serif;font-size:12px;padding:7px 14px;border-radius:40px;
+    letter-spacing:.06em;transition:all .3s;
+  }
+  .toggle:hover{border-color:var(--accent);color:var(--accent)}
+
+  main{max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,64px)}
+
+  /* ── 刊头 / 每日一问 ── */
+  .masthead{padding:64px 0 40px;border-bottom:2px solid var(--ink);position:relative}
+  .issue{display:flex;justify-content:space-between;font-family:'Fraunces',serif;font-size:12.5px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:30px}
+  .quote{
+    font-family:'Noto Serif SC',serif;font-weight:700;
+    font-size:clamp(34px,6vw,64px);line-height:1.1;letter-spacing:-.01em;max-width:14ch;
+  }
+  .quote em{font-family:'Fraunces',serif;font-style:italic;font-weight:300;color:var(--accent)}
+  .quote .drop{font-family:'Fraunces',serif;font-weight:900;color:var(--accent);font-size:1.15em}
+  .cite{margin-top:22px;font-style:italic;color:var(--ink2);font-size:16px}
+  .cite::before{content:"— "}
+  .folio{position:absolute;right:0;bottom:40px;font-family:'Fraunces',serif;font-size:clamp(72px,12vw,150px);
+    font-weight:900;color:var(--accent);opacity:.10;line-height:.8;pointer-events:none}
+
+  /* 进场动画 */
+  .rise{opacity:0;transform:translateY(26px);animation:rise 1s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  /* ── 数据条 ── */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+  .stat{padding:34px 0;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:none}
+  .stat .n{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(40px,6vw,60px);line-height:1;letter-spacing:-.02em}
+  .stat .n sup{font-size:.4em;font-weight:400;font-style:italic;color:var(--accent);vertical-align:super;margin-left:4px}
+  .stat .l{font-family:'Noto Serif SC',serif;color:var(--ink2);font-size:14px;margin-top:10px}
+  .stat .e{font-family:'Fraunces',serif;font-style:italic;font-size:12px;color:var(--dim)}
+
+  /* ── 区块标题 ── */
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin:64px 0 28px}
+  .sec-head h2{font-family:'Noto Serif SC',serif;font-weight:700;font-size:26px}
+  .sec-head .en{font-family:'Fraunces',serif;font-style:italic;color:var(--accent);font-size:16px}
+  .sec-head .rule{flex:1;height:1px;background:var(--line2)}
+  .sec-head .ix{font-family:'Fraunces',serif;font-size:13px;color:var(--dim);letter-spacing:.1em}
+
+  /* ── 写作画像 / 灵魂词 ── */
+  .portrait{display:grid;grid-template-columns:1.1fr 1fr;gap:48px;align-items:start}
+  @media(max-width:760px){.portrait{grid-template-columns:1fr;gap:28px}}
+  .soul-words{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:baseline}
+  .sw{font-family:'Noto Serif SC',serif;text-decoration:none;color:var(--ink);line-height:1;
+    opacity:0;animation:swin .7s cubic-bezier(.2,.8,.2,1) forwards;transition:color .3s}
+  .sw:hover{color:var(--accent)}
+  @keyframes swin{from{opacity:0;transform:translateY(14px) rotate(-2deg)}to{opacity:1;transform:none}}
+  .dims{border-top:1px solid var(--line)}
+  .dim{display:grid;grid-template-columns:84px 1fr;gap:16px;padding:15px 0;border-bottom:1px solid var(--line);align-items:start}
+  .dim .k{font-family:'Fraunces',serif;font-style:italic;color:var(--accent);font-size:14px}
+  .dim .v{font-size:15.5px;line-height:1.7;color:var(--ink2)}
+
+  /* ── 随笔列表 ── */
+  .essays{margin-top:6px}
+  .essay{display:grid;grid-template-columns:96px 1fr auto;gap:24px;align-items:baseline;
+    padding:22px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit;
+    transition:padding-left .4s cubic-bezier(.2,.8,.2,1)}
+  .essay:hover{padding-left:14px}
+  .essay .date{font-family:'Fraunces',serif;font-size:13px;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
+  .essay .date b{display:block;font-size:30px;font-weight:900;color:var(--ink);letter-spacing:-.02em}
+  .essay .ti{font-family:'Noto Serif SC',serif;font-weight:600;font-size:21px;line-height:1.3;transition:color .3s}
+  .essay:hover .ti{color:var(--accent)}
+  .essay .pv{color:var(--ink2);font-size:14.5px;margin-top:6px;line-height:1.6;
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .essay .side{display:flex;align-items:center;gap:10px;white-space:nowrap}
+  .essay .wc{font-family:'Fraunces',serif;font-size:13px;color:var(--dim)}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .dot.pos{background:var(--accent)} .dot.neu{background:var(--line2)} .dot.neg{background:#7a8fa6}
+
+  footer{margin:80px 0 60px;padding-top:30px;border-top:2px solid var(--ink);
+    display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px}
+  footer .b{font-family:'Noto Serif SC',serif;font-weight:900;font-size:18px}
+  footer .s{font-family:'Fraunces',serif;font-style:italic;color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+  <nav>
+    <div class="logo">文字时光机<small>The Time Machine of Words</small></div>
+    <div class="links">
+      <a class="on">总览<span>Overview</span></a>
+      <a>写作画像<span>Portrait</span></a>
+      <a>仓库<span>Drafts</span></a>
+      <a>写作<span>Write</span></a>
+      <button class="toggle" onclick="tt()">◑ 明 / 暗</button>
+    </div>
+  </nav>
+
+  <main>
+    <!-- 刊头 -->
+    <section class="masthead">
+      <div class="issue rise"><span>第 128 期 · ISSUE №128</span><span>2026 年 6 月</span></div>
+      <h1 class="quote rise" style="animation-delay:.1s"><span class="drop">「</span>我们写下的<em>每一个字</em>，都是寄给未来自己的信。」</h1>
+      <div class="cite rise" style="animation-delay:.25s">今日一问 · 你最近一次为什么而停笔？</div>
+      <div class="folio">№</div>
+    </section>
+
+    <!-- 数据 -->
+    <section class="stats">
+      <div class="stat rise" style="animation-delay:.15s"><div class="n">128<sup>篇</sup></div><div class="l">累计随笔</div><div class="e">Essays written</div></div>
+      <div class="stat rise" style="animation-delay:.25s"><div class="n">96.4<sup>k</sup></div><div class="l">总字数</div><div class="e">Words in total</div></div>
+      <div class="stat rise" style="animation-delay:.35s"><div class="n">23<sup>天</sup></div><div class="l">连续写作</div><div class="e">Day streak</div></div>
+    </section>
+
+    <!-- 写作画像 -->
+    <div class="sec-head"><h2>写作画像</h2><span class="en">Your Soul, in Words</span><span class="rule"></span><span class="ix">§ 01</span></div>
+    <section class="portrait">
+      <div class="soul-words" id="souls"></div>
+      <div class="dims">
+        <div class="dim rise" style="animation-delay:.2s"><div class="k">基调 Tone</div><div class="v">内省而克制，常在平静的叙述里藏一道暗涌。</div></div>
+        <div class="dim rise" style="animation-delay:.3s"><div class="k">母题 Motif</div><div class="v">海、黄昏、远方——你反复回到「离开与留下」之间。</div></div>
+        <div class="dim rise" style="animation-delay:.4s"><div class="k">句法 Syntax</div><div class="v">偏爱短句收尾，像把话说到一半就停了下来。</div></div>
+      </div>
+    </section>
+
+    <!-- 随笔 -->
+    <div class="sec-head"><h2>近期随笔</h2><span class="en">Recent Entries</span><span class="rule"></span><span class="ix">§ 02</span></div>
+    <section class="essays">
+      <a class="essay"><div class="date">JUN<b>11</b></div><div><div class="ti">海边那家旧书店还开着</div><div class="pv">绕过防波堤的时候，风把书页吹得哗哗响，像有人在替我读那些没读完的句子。</div></div><div class="side"><span class="wc">1,240 字</span><span class="dot pos"></span></div></a>
+      <a class="essay"><div class="date">JUN<b>09</b></div><div><div class="ti">关于沉默的几种用法</div><div class="pv">母亲不说话的时候最响。我学了很多年，才听懂那种安静里的叮嘱。</div></div><div class="side"><span class="wc">860 字</span><span class="dot neu"></span></div></a>
+      <a class="essay"><div class="date">JUN<b>05</b></div><div><div class="ti">黄昏是一天里最诚实的时刻</div><div class="pv">光开始撤退，影子拉得很长，所有白天撑住的东西，都在这一刻松了手。</div></div><div class="side"><span class="wc">1,510 字</span><span class="dot neg"></span></div></a>
+      <a class="essay"><div class="date">JUN<b>01</b></div><div><div class="ti">远方其实是一种借口</div><div class="pv">我们说想去远方，多半只是不想待在此刻。</div></div><div class="side"><span class="wc">640 字</span><span class="dot pos"></span></div></a>
+    </section>
+
+    <footer>
+      <div class="b">文字时光机</div>
+      <div class="s">Set in Noto Serif SC &amp; Fraunces · 编辑感 / Editorial 方向样例</div>
+    </footer>
+  </main>
+
+<script>
+  // 灵魂词：错落字号 + 逐个浮现（叙事化动效）
+  const words=[["孤独",58],["海",84],["黄昏",46],["母亲",64],["远方",40],["沉默",72],["光",52],["旧时",38],["潮汐",44]];
+  const c=document.getElementById('souls');
+  words.forEach((w,i)=>{const a=document.createElement('a');a.className='sw';a.href='#';
+    a.textContent=w[0];a.style.fontSize=w[1]+'px';a.style.animationDelay=(.15+i*.09)+'s';
+    a.style.fontWeight=w[1]>60?900:500;c.appendChild(a);});
+  // 明暗切换
+  function tt(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='light'?'dark':'light';}
+</script>
+</body>
+</html>

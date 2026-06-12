@@ -18,9 +18,9 @@ const BAR_CONFIG = {
 const BAR_H = 150
 
 const SEGMENTS = [
-  { key: 'positive', color: '#8a9a6a', label: '积极' },
-  { key: 'neutral',  color: '#c4935a', label: '中性' },
-  { key: 'negative', color: '#c47a7a', label: '消极' },
+  { key: 'positive', color: '#9aab78', label: '积极' },
+  { key: 'neutral',  color: '#e89b50', label: '中性' },
+  { key: 'negative', color: '#d08a8a', label: '消极' },
 ]
 
 export default function SentimentTimeline({ startDate, endDate }) {
@@ -82,9 +82,10 @@ export default function SentimentTimeline({ startDate, endDate }) {
             style={{
               padding: '5px 14px', borderRadius: 6, fontSize: 12,
               cursor: 'pointer', border: '1px solid',
-              borderColor: granularity === key ? '#8B6F47' : '#e0d5c5',
-              background: granularity === key ? '#8B6F47' : '#faf8f5',
-              color: granularity === key ? 'white' : '#8B6F47',
+              borderColor: granularity === key ? 'var(--accent)' : 'var(--border)',
+              background: granularity === key ? 'var(--accent)' : 'var(--panel)',
+              color: granularity === key ? 'var(--on-accent)' : 'var(--accent)',
+              fontWeight: granularity === key ? 600 : 400,
               transition: 'all 0.15s',
             }}
           >
@@ -100,13 +101,13 @@ export default function SentimentTimeline({ startDate, endDate }) {
         style={{
           overflowX: 'auto', overflowY: 'visible',
           cursor: 'grab', paddingBottom: 4,
-          scrollbarWidth: 'thin', scrollbarColor: '#e0d5c5 transparent',
+          scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent',
         }}
       >
         <div style={{
           display: 'flex', alignItems: 'flex-end', gap,
           width: innerW, height: BAR_H + 28,
-          borderBottom: '1px solid #ede6da',
+          borderBottom: '1px solid var(--border)',
           paddingBottom: 24, position: 'relative',
         }}>
           {data.map((d, i) => {
@@ -135,7 +136,8 @@ export default function SentimentTimeline({ startDate, endDate }) {
                 {/* X 轴标签 */}
                 <div style={{
                   position: 'absolute', bottom: -20, fontSize: 9,
-                  color: isLast ? '#8B6F47' : '#ccc',
+                  fontFamily: 'var(--font-display)',
+                  color: isLast ? 'var(--accent)' : 'var(--text-hint)',
                   fontWeight: isLast ? 600 : 400,
                   whiteSpace: 'nowrap', textAlign: 'center', width: '100%',
                 }}>
@@ -152,7 +154,7 @@ export default function SentimentTimeline({ startDate, endDate }) {
         {SEGMENTS.map(({ color, label }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
             <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-            <span style={{ color: '#999' }}>{label}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
           </div>
         ))}
       </div>
@@ -161,17 +163,18 @@ export default function SentimentTimeline({ startDate, endDate }) {
       {tooltip && (
         <div style={{
           position: 'fixed', left: tooltip.x + 14, top: tooltip.y - 82,
-          background: 'rgba(45,31,20,0.9)', color: '#f5ede0',
+          background: 'rgba(20,14,8,0.94)', color: '#f3ece0',
           padding: '8px 12px', borderRadius: 8, fontSize: 12,
           pointerEvents: 'none', zIndex: 9999,
-          lineHeight: 1.9, boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
+          lineHeight: 1.9, boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
+          border: '1px solid rgba(243,199,129,0.15)',
           whiteSpace: 'nowrap',
         }}>
-          <div style={{ fontSize: 10, color: '#a89070', marginBottom: 2 }}>
+          <div style={{ fontSize: 10, color: '#b89a72', marginBottom: 2 }}>
             {tooltip.label} · {tooltip.essays} 篇
           </div>
           <span style={{ color: '#a4b87e' }}>积极 {tooltip.positive}%</span><br />
-          <span style={{ color: '#d4a96a' }}>中性 {tooltip.neutral}%</span><br />
+          <span style={{ color: '#f3c781' }}>中性 {tooltip.neutral}%</span><br />
           <span style={{ color: '#d4908a' }}>消极 {tooltip.negative}%</span>
         </div>
       )}

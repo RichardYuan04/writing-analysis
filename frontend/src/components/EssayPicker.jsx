@@ -30,7 +30,7 @@ function highlightKeyword(text, keyword) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark style={{ background: '#fde68a', borderRadius: 2, padding: '0 1px', color: '#92400e' }}>
+      <mark style={{ background: 'color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 2, padding: '0 1px', color: 'var(--honey)' }}>
         {text.slice(idx, idx + keyword.length)}
       </mark>
       {text.slice(idx + keyword.length)}
@@ -86,6 +86,8 @@ export default function EssayPicker({ onAnalyze }) {
     setAnalyzing(false)
   }
 
+  const selBg = 'color-mix(in srgb, var(--accent) 14%, var(--panel))'
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* 快捷入口 */}
@@ -95,15 +97,15 @@ export default function EssayPicker({ onAnalyze }) {
             onClick={() => setSelectedId(latestEssay.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 13px', background: selectedId === latestEssay.id ? '#f5ede0' : '#faf8f5',
-              border: `1px solid ${selectedId === latestEssay.id ? '#8B6F47' : '#d4a96a'}`,
-              borderRadius: 8, fontSize: 12, color: '#8B6F47', cursor: 'pointer', fontWeight: 'bold',
+              padding: '7px 13px', background: selectedId === latestEssay.id ? selBg : 'var(--panel)',
+              border: `1px solid ${selectedId === latestEssay.id ? 'var(--accent)' : 'var(--accent-light)'}`,
+              borderRadius: 8, fontSize: 12, color: 'var(--accent)', cursor: 'pointer', fontWeight: 'bold',
               whiteSpace: 'nowrap',
             }}
           >
             ⚡ 最近一篇
           </button>
-          <span style={{ fontSize: 12, color: '#bbb' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
             《{latestEssay.title}》· {latestEssay.date}
           </span>
         </div>
@@ -111,9 +113,9 @@ export default function EssayPicker({ onAnalyze }) {
 
       {/* 分隔线 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ flex: 1, height: 1, background: '#ede6da' }} />
-        <span style={{ fontSize: 11, color: '#ccc', whiteSpace: 'nowrap' }}>或从列表选择</span>
-        <div style={{ flex: 1, height: 1, background: '#ede6da' }} />
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        <span style={{ fontSize: 11, color: 'var(--text-hint)', whiteSpace: 'nowrap' }}>或从列表选择</span>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
       </div>
 
       {/* 搜索 + 时间筛选 */}
@@ -123,8 +125,8 @@ export default function EssayPicker({ onAnalyze }) {
           onChange={e => setQuery(e.target.value)}
           placeholder="搜索标题或正文关键词..."
           style={{
-            flex: 1, padding: '8px 12px', border: '1px solid #e0d5c5',
-            borderRadius: 8, background: '#faf8f5', fontSize: 12, color: '#5a4a3a',
+            flex: 1, padding: '8px 12px', border: '1px solid var(--border)',
+            borderRadius: 8, background: 'var(--panel)', fontSize: 12, color: 'var(--text-primary)',
             outline: 'none',
           }}
         />
@@ -132,9 +134,9 @@ export default function EssayPicker({ onAnalyze }) {
           value={dateRange}
           onChange={e => { setDateRange(e.target.value); setPage(0) }}
           style={{
-            padding: '8px 10px', border: '1px solid #e0d5c5',
-            borderRadius: 8, background: '#faf8f5', fontSize: 11,
-            color: '#8B6F47', cursor: 'pointer',
+            padding: '8px 10px', border: '1px solid var(--border)',
+            borderRadius: 8, background: 'var(--panel)', fontSize: 11,
+            color: 'var(--accent)', cursor: 'pointer',
           }}
         >
           {DATE_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -143,16 +145,16 @@ export default function EssayPicker({ onAnalyze }) {
 
       {/* 搜索状态提示 */}
       {query.trim() && (
-        <div style={{ fontSize: 11, color: '#aaa' }}>
-          找到 <span style={{ color: '#8B6F47', fontWeight: 'bold' }}>{filtered.length}</span> 篇包含「
-          <span style={{ color: '#8B6F47', fontWeight: 'bold' }}>{query}</span>」的随笔
+        <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>
+          找到 <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{filtered.length}</span> 篇包含「
+          <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{query}</span>」的随笔
         </div>
       )}
 
       {/* 文章列表 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {paged.length === 0 && (
-          <div style={{ padding: '16px 0', textAlign: 'center', fontSize: 13, color: '#bbb' }}>
+          <div style={{ padding: '16px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-hint)' }}>
             没有找到匹配的随笔
           </div>
         )}
@@ -163,24 +165,24 @@ export default function EssayPicker({ onAnalyze }) {
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '9px 12px',
-              border: `1px solid ${selectedId === e.id ? '#8B6F47' : '#ede6da'}`,
+              border: `1px solid ${selectedId === e.id ? 'var(--accent)' : 'var(--border)'}`,
               borderRadius: 8, cursor: 'pointer',
-              background: selectedId === e.id ? '#f5ede0' : '#faf8f5',
+              background: selectedId === e.id ? selBg : 'var(--panel)',
               transition: 'all 0.15s',
             }}
           >
-            <span style={{ fontSize: 11, color: '#bbb', whiteSpace: 'nowrap', width: 76, flexShrink: 0 }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text-hint)', whiteSpace: 'nowrap', width: 76, flexShrink: 0 }}>
               {e.date}
             </span>
             <span style={{
-              fontSize: 13, flex: 1,
-              color: selectedId === e.id ? '#8B6F47' : '#5a4a3a',
+              fontFamily: 'var(--font-serif)', fontSize: 13, flex: 1,
+              color: selectedId === e.id ? 'var(--accent)' : 'var(--text-primary)',
               fontWeight: selectedId === e.id ? 'bold' : 'normal',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {query.trim() ? highlightKeyword(e.title, query.trim()) : e.title}
             </span>
-            <span style={{ fontSize: 10, color: '#ccc', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-hint)', whiteSpace: 'nowrap' }}>
               {e.word_count}字
             </span>
           </div>
@@ -195,9 +197,9 @@ export default function EssayPicker({ onAnalyze }) {
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
               style={{
-                width: 28, height: 28, border: '1px solid #ede6da', borderRadius: 6,
-                background: page === 0 ? '#faf8f5' : 'white',
-                color: page === 0 ? '#ccc' : '#8B6F47', cursor: page === 0 ? 'default' : 'pointer',
+                width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6,
+                background: 'var(--panel)',
+                color: page === 0 ? 'var(--text-hint)' : 'var(--accent)', cursor: page === 0 ? 'default' : 'pointer',
                 fontSize: 12,
               }}
             >&lt;</button>
@@ -205,7 +207,7 @@ export default function EssayPicker({ onAnalyze }) {
               {Array.from({ length: totalPages }).map((_, i) => (
                 <div key={i} onClick={() => setPage(i)} style={{
                   width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
-                  background: i === page ? '#8B6F47' : '#e0d5c5',
+                  background: i === page ? 'var(--accent)' : 'var(--border)',
                 }} />
               ))}
             </div>
@@ -213,14 +215,14 @@ export default function EssayPicker({ onAnalyze }) {
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={page === totalPages - 1}
               style={{
-                width: 28, height: 28, border: '1px solid #ede6da', borderRadius: 6,
-                background: page === totalPages - 1 ? '#faf8f5' : 'white',
-                color: page === totalPages - 1 ? '#ccc' : '#8B6F47',
+                width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6,
+                background: 'var(--panel)',
+                color: page === totalPages - 1 ? 'var(--text-hint)' : 'var(--accent)',
                 cursor: page === totalPages - 1 ? 'default' : 'pointer', fontSize: 12,
               }}
             >&gt;</button>
           </div>
-          <span style={{ fontSize: 11, color: '#aaa' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>
             第 {page + 1} / {totalPages} 页 · 共 {filtered.length} 篇
           </span>
         </div>
@@ -232,8 +234,9 @@ export default function EssayPicker({ onAnalyze }) {
         disabled={!selectedId || analyzing}
         style={{
           padding: '12px', borderRadius: 8, border: 'none', cursor: selectedId && !analyzing ? 'pointer' : 'default',
-          background: selectedId && !analyzing ? '#8B6F47' : '#d4c4b0',
-          color: 'white', fontSize: 14, fontWeight: 500, textAlign: 'center',
+          background: selectedId && !analyzing ? 'var(--accent)' : 'var(--border)',
+          color: selectedId && !analyzing ? 'var(--on-accent)' : 'var(--text-hint)',
+          fontSize: 14, fontWeight: 600, textAlign: 'center',
         }}
       >
         {analyzing
