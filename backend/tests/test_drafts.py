@@ -15,3 +15,18 @@ def test_create_draft(client, db):
 def test_create_draft_rejects_empty_content(client, db):
     r = client.post("/drafts", json={"title": "x", "content": "   ", "date": "2026-06-12"})
     assert r.status_code == 400
+
+
+def test_list_drafts_ordered_by_updated_desc(client, db):
+    a = client.post("/drafts", json={"title": "A", "content": "aaa", "date": "2026-06-10"}).json()
+    b = client.post("/drafts", json={"title": "B", "content": "bbb", "date": "2026-06-11"}).json()
+    r = client.get("/drafts")
+    assert r.status_code == 200
+    ids = [d["id"] for d in r.json()]
+    assert ids == [b["id"], a["id"]]  # 后建的 B 排最前
+
+
+def test_list_drafts_empty(client, db):
+    r = client.get("/drafts")
+    assert r.status_code == 200
+    assert r.json() == []

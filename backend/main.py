@@ -874,6 +874,15 @@ def create_draft(data: DraftRequest):
     return result
 
 
+@app.get("/drafts")
+def list_drafts():
+    session = Session()
+    rows = session.query(Draft).order_by(Draft.updated_at.desc(), Draft.id.desc()).all()
+    result = [_draft_dict(d) for d in rows]
+    session.close()
+    return result
+
+
 @app.delete("/essays/{essay_id}")
 def delete_essay(essay_id: int):
     session = Session()
