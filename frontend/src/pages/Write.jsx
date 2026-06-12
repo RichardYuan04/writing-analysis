@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { createEssay, moodReply } from '../api'
+import { createEssay, moodReply, deleteDraft } from '../api'
 import MoodCard from '../components/MoodCard'
 import AssistPanel from '../components/AssistPanel'
+import DraftPanel from '../components/DraftPanel'
 import QUOTES from '../data/quotes'
 
 const DRAFT_KEY = 'wt_write_draft'
@@ -38,11 +39,15 @@ export default function Write({ onSaved, prefill, onBack }) {
   const contentRef = useRef(null)
   const moodRef = useRef(null)
   const savingRef = useRef(false)   // 同步防重入，挡住快速连点导致的重复创建
+  const hydratedRef = useRef(false) // 首次挂载（可能正从本地恢复草稿）时不清空，避免误删
+  const [confirmClear, setConfirmClear] = useState(false)  // 站内「清空」确认框
   const [greeting] = useState(daily)
   const [quote, setQuote] = useState(() => pickQuote(null))
   const [sel, setSel] = useState(null)            // 当前选区 {start,end,text}
   const [panelCollapsed, setPanelCollapsed] = useState(false)
   const [undoStack, setUndoStack] = useState([])  // 替换前整篇正文快照栈
+  const [draftId, setDraftId] = useState(null)            // 当前正在编辑的草稿 id
+  const [draftPanelCollapsed, setDraftPanelCollapsed] = useState(false)
 
   // 初始化：prefill（来自仓库）优先；否则尝试恢复本地草稿
   useEffect(() => {
@@ -65,7 +70,16 @@ export default function Write({ onSaved, prefill, onBack }) {
   // 无感自动保存（节流写 localStorage），不打断输入
   useEffect(() => {
     if (mood) return                       // 已保存、展示心绪卡时不再写草稿
-    if (!title && !content) return
+    if (!title && !content) {
+      // 内容被清空（删到空）：复位状态并清掉本地草稿，回到「尚未开始」。
+      // 首次挂载时可能正从 localStorage 恢复草稿（恢复 effect 已读到内存里），
+      // 这一跑不要清，否则会把刚恢复的草稿误删。
+      if (!hydratedRef.current) { hydratedRef.current = true; return }
+      setAutoState('idle'); setAutoAt('')
+      localStorage.removeItem(DRAFT_KEY)
+      return
+    }
+    hydratedRef.current = true
     setAutoState('saving')
     const t = setTimeout(() => {
       const at = new Date().toTimeString().slice(0, 5)
@@ -105,7 +119,16 @@ export default function Write({ onSaved, prefill, onBack }) {
     setUndoStack(s => [...s, content])
     setContent(content.slice(0, range.start) + newText + content.slice(range.end))
     setSel(null)
-    setTimeout(() => contentRef.current?.focus(), 0)
+    // 替换后把选区设到「新文字」范围：既高亮提示改了哪段，又让视图滚到此处。
+    // （此前只调 focus() 不设选区，光标默认落到文末，导致正文滚到最底部——就是那个 bug）
+    const newStart = range.start
+    const newEnd = range.start + newText.length
+    setTimeout(() => {
+      const el = contentRef.current
+      if (!el) return
+      el.focus()
+      try { el.setSelectionRange(newStart, newEnd) } catch { /* 忽略 */ }
+    }, 0)
   }
 
   // 撤回最近一次替换：还原整篇到替换前快照
@@ -117,6 +140,45 @@ export default function Write({ onSaved, prefill, onBack }) {
     })
   }
 
+  // 点开草稿箱里的某份 → 载入编辑器继续写
+  const openDraft = (d) => {
+    setTitle(d.title || '')
+    setContent(d.content || '')
+    setDate(d.date || today)
+    setDraftId(d.id)
+    setMood(null)
+    setSel(null)
+    setUndoStack([])
+    setAutoState('saved')
+    setTimeout(() => contentRef.current?.focus(), 0)
+  }
+
+  // 清空当前编辑器：先弹站内确认框；不影响草稿箱里已存的草稿
+  const requestClear = () => {
+    if (!title && !content) return
+    setConfirmClear(true)
+  }
+  const doClear = () => {
+    setConfirmClear(false)
+    setTitle('')
+    setContent('')
+    setDate(today)
+    setDraftId(null)
+    setSel(null)
+    setUndoStack([])
+    setMood(null)
+    setAutoState('idle'); setAutoAt('')
+    localStorage.removeItem(DRAFT_KEY)
+  }
+
+  // 确认框打开时支持 Esc 关闭
+  useEffect(() => {
+    if (!confirmClear) return
+    const onKey = (e) => { if (e.key === 'Escape') setConfirmClear(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [confirmClear])
+
   const handleSave = async () => {
     if (savingRef.current || mood) return   // 防重入 + 已保存(卡片已出)不再创建
     if (!title.trim() || !content.trim()) { setError('标题和内容不能为空'); return }
@@ -125,6 +187,7 @@ export default function Write({ onSaved, prefill, onBack }) {
     try {
       const res = await createEssay({ title, content, date })
       localStorage.removeItem(DRAFT_KEY)
+      if (draftId) { try { await deleteDraft(draftId) } catch { /* ignore */ } setDraftId(null) }
       // 后端旧版/未返回心绪卡时，退回原行为（保存后离开），不渲染空卡
       if (!res.data.mood_card || !res.data.mood_card.tone) { onSaved(); return }
       setMood({ id: res.data.id, ...res.data.mood_card })
@@ -197,9 +260,12 @@ export default function Write({ onSaved, prefill, onBack }) {
         {mood ? (
           <span className="saved-flag">已保存 ✓</span>
         ) : (
-          <button className="save-btn" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中…' : '保存'}
-          </button>
+          <>
+            <button className="clear-btn" onClick={requestClear} disabled={!title && !content}>清空</button>
+            <button className="save-btn" onClick={handleSave} disabled={saving}>
+              {saving ? '保存中…' : '保存'}
+            </button>
+          </>
         )}
       </div>
 
@@ -214,14 +280,38 @@ export default function Write({ onSaved, prefill, onBack }) {
       )}
       </div>
 
-      <AssistPanel
-        sel={sel}
-        collapsed={panelCollapsed}
-        onToggle={() => setPanelCollapsed(c => !c)}
-        onApply={applyAssist}
-        onUndo={undoLast}
-        canUndo={undoStack.length > 0}
-      />
+      <div className="write-right">
+        <AssistPanel
+          sel={sel}
+          collapsed={panelCollapsed}
+          onToggle={() => setPanelCollapsed(c => !c)}
+          onApply={applyAssist}
+          onUndo={undoLast}
+          canUndo={undoStack.length > 0}
+        />
+        <DraftPanel
+          current={{ title, content, date }}
+          draftId={draftId}
+          onSaved={(d) => setDraftId(d.id)}
+          onOpen={openDraft}
+          onDraftRemoved={() => setDraftId(null)}
+          collapsed={draftPanelCollapsed}
+          onToggle={() => setDraftPanelCollapsed(c => !c)}
+        />
+      </div>
+
+      {confirmClear && (
+        <div className="modal-overlay" onClick={() => setConfirmClear(false)}>
+          <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">清空当前内容？</div>
+            <p className="modal-msg">编辑区里的标题和正文会被清掉，回到「尚未开始」。<br />此操作不影响已存入草稿箱的草稿。</p>
+            <div className="modal-acts">
+              <button className="modal-ghost" onClick={() => setConfirmClear(false)}>取消</button>
+              <button className="modal-primary" onClick={doClear} autoFocus>清空</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

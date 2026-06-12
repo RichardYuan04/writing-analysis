@@ -16,7 +16,8 @@ export default function WordCloud({ words = [] }) {
     const max = top[0]?.count || 1
     const min = top[top.length - 1]?.count || 1
     const scale = d3.scaleLinear().domain([min, max]).range([14, 52])
-    const colors = ['#6c63ff', '#f64f59', '#43cea2', '#f7971e', '#4facfe', '#764ba2']
+    // 暖光色阶：橘 / 蜂蜜 / 焦糖 / 暖棕，呼应「深夜书桌」主题
+    const colors = ['#e89b50', '#f3c781', '#d6a468', '#c47a4a', '#b89a72', '#9c8568']
 
     cloud()
       .size([w, h])

@@ -1,0 +1,18 @@
+# 跨平台换行符规范：仓库里统一存 LF，各平台检出时按需转换。
+* text=auto
+
+# Shell 脚本永远用 LF —— 即使在 Windows 检出，
+# 也要保证回到 macOS/Linux 上 bash 能正常执行（CRLF 会让 bash 报错）。
+*.sh text eol=lf
+
+# PowerShell 脚本是 Windows 专用，用 CRLF（PS 5.1 更友好）。
+*.ps1 text eol=crlf
+
+# 文本类源码/配置：交给 text=auto 规范化即可（无需逐一列出）。
+
+# 二进制资源：不做任何换行符处理。
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.db binary

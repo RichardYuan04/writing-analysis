@@ -51,7 +51,7 @@ app.add_middleware(
 )
 
 # 数据库
-engine = create_engine("sqlite:///./essays.db")
+engine = create_engine(os.getenv("ESSAYS_DB_URL", "sqlite:///./essays.db"))
 Base = declarative_base()
 
 class Essay(Base):
@@ -68,6 +68,26 @@ class Essay(Base):
     emotion_detail = Column(Text)   # JSON: {joy, gratitude, love, neutral, surprise, anger, ...}
     mood_card = Column(Text)        # JSON: {tone, tone_emoji, keywords[], ai_reply, ai_reply_status, generated_at}
     created_at = Column(DateTime, default=datetime.now)
+
+
+class StyleProfile(Base):
+    __tablename__ = "style_profile"
+    id = Column(Integer, primary_key=True)      # 固定单行，id=1
+    content = Column(Text)                       # 注入用的 SOUL 串（用户可改后的最终版）
+    rationale = Column(Text)                     # JSON：分维度依据
+    source_essay_ids = Column(Text)              # JSON 数组：本次养成用了哪几篇
+    generated_at = Column(DateTime, default=datetime.now)
+    user_edited = Column(Integer, default=0)     # 0/1
+
+
+class Draft(Base):
+    __tablename__ = "drafts"
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200))
+    content = Column(Text)
+    date = Column(String(10))                    # YYYY-MM-DD（用户设定的写作日期）
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now)
 
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -487,6 +507,64 @@ def essay_mood_reply(essay_id: int):
     return mood
 
 
+def _sample_excerpts(essays, per_essay_cap: int = 400, total_cap: int = 800) -> str:
+    """从文章列表取未改写摘录，保留原始换行与标点（节奏不可压平）。
+    每篇至多 per_essay_cap 字，累计到 total_cap 即停。"""
+    parts = []
+    total = 0
+    for e in essays:
+        if total >= total_cap:
+            break
+        content = (e.content or "").strip()
+        if not content:
+            continue
+        snippet = content[:per_essay_cap]
+        if len(content) > per_essay_cap:
+            snippet += "…"
+        title = (getattr(e, "title", "") or "").strip() or "无题"
+        parts.append(f"【{title}】\n{snippet}")
+        total += len(snippet)
+    return "\n\n".join(parts)
+
+
+_SOUL_LABELS = [("节奏", "rhythm"), ("意象", "imagery"), ("情绪", "emotion"),
+                ("用词", "diction"), ("手法", "signature")]
+
+
+def _parse_soul_output(raw: str) -> dict:
+    """解析「标签分段」格式 → {soul, rationale}。
+    不用 JSON：中文风格串里常含引号/标点，会冲破 JSON；标签分段对此免疫。
+    期望格式：
+        【SOUL】
+        <100-200字风格指令>
+        【节奏】…【意象】…【情绪】…【用词】…【手法】…
+    解析失败时把整段（去围栏后）当 soul 兜底，绝不抛异常。"""
+    text = (raw or "").strip()
+    # 去掉可能的 ``` 围栏
+    fence = re.search(r"```(?:\w+)?\s*(.+?)\s*```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    # 逐维抓 rationale（一行一句）
+    rationale = {}
+    for zh, key in _SOUL_LABELS:
+        m = re.search(rf"【{zh}】[:：]?\s*(.+)", text)
+        if m:
+            v = m.group(1).strip()
+            if v:
+                rationale[key] = v
+    # 抓 SOUL：从【SOUL】到第一个维度标签（或文末）之间
+    soul = ""
+    m = re.search(r"【SOUL】[:：]?\s*(.+?)\s*(?=【(?:节奏|意象|情绪|用词|手法)】|$)",
+                  text, re.DOTALL)
+    if m:
+        soul = m.group(1).strip()
+    if not soul:
+        # 兜底：去掉所有【…】标签行，剩下的当 soul；再不行就用整段
+        stripped = re.sub(r"【[^】]*】[:：]?[^\n]*", "", text).strip()
+        soul = stripped or text
+    return {"soul": soul, "rationale": rationale}
+
+
 # ── 写作工具面板 ──
 # 无状态文本变换：选中一段文字 → AI 辅助。四类：缩减/同义替换/比喻/扩展。
 # style_profile 为可选；缺省时走降级分支（仅要求贴合原文与上下文，不强加风格）。
@@ -506,6 +584,16 @@ def _assist_system(style_profile: str) -> str:
     return f"你是写作助手。{style_line}\n直接输出建议内容，不要解释、不要加前缀。"
 
 
+def _load_soul_content() -> str:
+    """从库里读当前 SOUL 文档的 content；没有则返回空串（走降级分支）。"""
+    session = Session()
+    try:
+        row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+        return (row.content or "").strip() if row else ""
+    finally:
+        session.close()
+
+
 def _parse_options(raw: str) -> list:
     """把「每行一个选项（可能带 1. / - 编号）」的输出解析成列表。"""
     out = []
@@ -521,15 +609,18 @@ def _parse_options(raw: str) -> list:
     return out[:4]
 
 
-def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options: bool):
+def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options: bool, model: str,
+                 system: str = None):
     text = (data.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="选中文字不能为空")
+    # system 为 None 时默认注入 SOUL；显式传入（如比喻）则用传入的，不注入 SOUL
+    sys_prompt = system if system is not None else _assist_system(_load_soul_content())
     try:
         message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=model,
             max_tokens=max_tokens,
-            system=_assist_system(data.style_profile),
+            system=sys_prompt,
             messages=[{"role": "user", "content": user}],
         )
         raw = message.content[0].text.strip()
@@ -555,7 +646,7 @@ def assist_reduce(data: AssistRequest):
         "要求：保留核心意思和情感，删去冗余表达，保持作者的句式风格，直接输出压缩后的文字。\n\n"
         f"原文：{data.text.strip()}"
     )
-    return _assist_call(data, user, max_tokens=512, parse_options=False)
+    return _assist_call(data, user, max_tokens=512, parse_options=False, model="claude-haiku-4-5-20251001")
 
 
 @app.post("/assist/synonyms")
@@ -565,17 +656,30 @@ def assist_synonyms(data: AssistRequest):
         "要求：保持原意，贴合上下文语境，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
         f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=300, parse_options=True)
+    return _assist_call(data, user, max_tokens=300, parse_options=True, model="claude-sonnet-4-6")
+
+
+METAPHOR_SYSTEM = (
+    "你是一位精于比喻的中文写作高手。请完全自由地探索喻体、比喻方式与遣词造句，"
+    "不必受作者既有风格的约束，大胆出新意。"
+    "只输出比喻本身，每个一行，不要解释、不要加前缀。"
+)
 
 
 @app.post("/assist/metaphor")
 def assist_metaphor(data: AssistRequest):
     user = (
-        "请为以下文字提供 2-3 个比喻表达，帮助将其意象化或更有画面感。\n"
-        "要求：比喻贴合上下文语境，避免陈词滥调，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
+        "请为下面这段文字提供 2-3 个比喻。\n"
+        "要求：\n"
+        "1. 先抓住这段文字真正想表达的核心关系或感受，再为这个内核打比方；不要逐字给整段套比喻。\n"
+        "2. 如果选中文字里本身已经含有一个比喻，就顺着它的思路，给出 2-3 个【平行的、全新的】比喻"
+        "（保留同样的表达结构，但换用不同的喻体），作为可替换或扩充的备选。\n"
+        "3. 喻体要新鲜多样、彼此不同，避免陈词滥调，也不要与原文已有的喻体重复。\n"
+        "4. 每个比喻单独一行，直接输出。\n\n"
         f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=400, parse_options=True)
+    return _assist_call(data, user, max_tokens=400, parse_options=True,
+                        model="claude-opus-4-8", system=METAPHOR_SYSTEM)
 
 
 @app.post("/assist/expand")
@@ -585,7 +689,228 @@ def assist_expand(data: AssistRequest):
         "要求：补充细节、感受或场景描写，自然融入原文语境，保持作者风格，直接输出扩展后的文字。\n\n"
         f"原文：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=700, parse_options=False)
+    return _assist_call(data, user, max_tokens=700, parse_options=False, model="claude-sonnet-4-6")
+
+
+# ── 风格 SOUL 文档 ──
+class StyleProfileGenerateRequest(BaseModel):
+    essay_ids: list[int]
+
+
+def _build_soul_prompt(portrait: dict, excerpts: str) -> str:
+    return (
+        "以下是某作者的写作风格量化数据与若干篇原文摘录。\n\n"
+        "## 量化锚点（客观统计，供参考，勿照搬数字）\n"
+        f"- 情感基调：{portrait.get('tone')}\n"
+        f"- 句式偏好：{portrait.get('sentence_style')}（平均句长 {portrait.get('avg_sentence_length')} 字）\n"
+        f"- 词汇丰富度：{portrait.get('vocab_richness')}（TTR={portrait.get('ttr')}）\n"
+        f"- 标点习惯：{portrait.get('punct_style')}\n"
+        f"- 段落风格：{portrait.get('para_style')}\n"
+        f"- 篇幅偏好：{portrait.get('volume_style')}\n"
+        f"- 灵魂词汇：{', '.join(portrait.get('soul_words', []))}\n\n"
+        "## 原文摘录（保留了原始断句与节奏，请重点感受其节奏与意象）\n"
+        f"{excerpts}\n\n"
+        "请分两步：\n"
+        "第一步（在心里分析，不要输出）：从五个维度刻画该作者的风格——\n"
+        "  1) 句子节奏与长短  2) 意象/感官/比喻倾向  3) 情绪表达方式（克制/外放/叙事）\n"
+        "  4) 用词（口语/书面/文学性）  5) 标志性手法（标点、留白、重复、转折等）\n"
+        "第二步（输出）：把以上压缩成一段 100–200 字的密集风格指令，可直接注入用于指挥 AI 模仿该风格写作。\n\n"
+        "请严格按以下格式输出，不要使用 JSON、不要加任何额外说明文字（风格串里可自由使用引号和标点）：\n"
+        "【SOUL】\n（这里写 100-200 字的风格指令）\n\n"
+        "【节奏】（一句话）\n【意象】（一句话）\n【情绪】（一句话）\n【用词】（一句话）\n【手法】（一句话）"
+    )
+
+
+SOUL_SYSTEM = (
+    "你是一名法医语言学家 + 中文写作风格分析师，擅长从文本中识别作者独有的声音，"
+    "并把它压缩成可直接用于指导写作的风格指令。只描述特征，不评价好坏，"
+    "不使用「该作者/这位作者」等人称，直接描述风格本身。"
+)
+
+
+@app.post("/style-profile/generate")
+def generate_style_profile(req: StyleProfileGenerateRequest):
+    if not req.essay_ids:
+        raise HTTPException(status_code=400, detail="请至少选择一篇文章")
+    session = Session()
+    essays = session.query(Essay).filter(Essay.id.in_(req.essay_ids)).order_by(Essay.date).all()
+    if not essays:
+        session.close()
+        raise HTTPException(status_code=400, detail="选中的文章不存在")
+    portrait = compute_portrait(essays)
+    excerpts = _sample_excerpts(essays)
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=800,
+            system=SOUL_SYSTEM,
+            messages=[{"role": "user", "content": _build_soul_prompt(portrait, excerpts)}],
+        )
+        parsed = _parse_soul_output(message.content[0].text)
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.close()
+        print(f"[soul] generate error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+    if not row:
+        row = StyleProfile(id=1)
+        session.add(row)
+    row.content = parsed["soul"]
+    row.rationale = json.dumps(parsed["rationale"], ensure_ascii=False)
+    row.source_essay_ids = json.dumps([e.id for e in essays])
+    row.generated_at = datetime.now()
+    row.user_edited = 0
+    session.commit()
+    result = {
+        "content": row.content,
+        "rationale": parsed["rationale"],
+        "source_essay_ids": [e.id for e in essays],
+        "generated_at": row.generated_at.isoformat(),
+        "user_edited": 0,
+    }
+    session.close()
+    return result
+
+
+@app.get("/style-profile")
+def get_style_profile():
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+    if not row:
+        session.close()
+        return {"exists": False}
+    # 自上次养成后，更新过/新建过的文章数（按 created_at 粗略估计）
+    new_count = 0
+    if row.generated_at:
+        new_count = session.query(Essay).filter(Essay.created_at > row.generated_at).count()
+    try:
+        rationale = json.loads(row.rationale) if row.rationale else {}
+    except Exception:
+        rationale = {}
+    try:
+        ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
+    except Exception:
+        ids = []
+    result = {
+        "exists": True,
+        "content": row.content or "",
+        "rationale": rationale,
+        "source_essay_ids": ids,
+        "generated_at": row.generated_at.isoformat() if row.generated_at else None,
+        "user_edited": int(row.user_edited or 0),
+        "new_essays_since": new_count,
+    }
+    session.close()
+    return result
+
+
+class StyleProfileUpdateRequest(BaseModel):
+    content: str
+
+
+@app.put("/style-profile")
+def update_style_profile(req: StyleProfileUpdateRequest):
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+    if not row:
+        row = StyleProfile(id=1, source_essay_ids="[]", rationale="{}")
+        session.add(row)
+    row.content = (req.content or "").strip()
+    row.user_edited = 1
+    row.generated_at = datetime.now()
+    session.commit()
+    try:
+        ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
+    except Exception:
+        ids = []
+    try:
+        rationale = json.loads(row.rationale) if row.rationale else {}
+    except Exception:
+        rationale = {}
+    result = {
+        "content": row.content,
+        "rationale": rationale,
+        "source_essay_ids": ids,
+        "generated_at": row.generated_at.isoformat(),
+        "user_edited": 1,
+    }
+    session.close()
+    return result
+
+
+# ── 草稿箱 ──
+class DraftRequest(BaseModel):
+    title: str = ""
+    content: str
+    date: str = ""
+
+
+def _draft_dict(d) -> dict:
+    return {
+        "id": d.id,
+        "title": d.title or "",
+        "content": d.content or "",
+        "date": d.date or "",
+        "created_at": d.created_at.isoformat() if d.created_at else None,
+        "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+    }
+
+
+@app.post("/drafts")
+def create_draft(data: DraftRequest):
+    if not (data.content or "").strip():
+        raise HTTPException(status_code=400, detail="草稿内容不能为空")
+    session = Session()
+    now = datetime.now()
+    d = Draft(title=data.title or "", content=data.content, date=data.date or "",
+              created_at=now, updated_at=now)
+    session.add(d)
+    session.commit()
+    result = _draft_dict(d)
+    session.close()
+    return result
+
+
+@app.get("/drafts")
+def list_drafts():
+    session = Session()
+    rows = session.query(Draft).order_by(Draft.updated_at.desc(), Draft.id.desc()).all()
+    result = [_draft_dict(d) for d in rows]
+    session.close()
+    return result
+
+
+@app.put("/drafts/{draft_id}")
+def update_draft(draft_id: int, data: DraftRequest):
+    session = Session()
+    d = session.query(Draft).filter(Draft.id == draft_id).first()
+    if not d:
+        session.close()
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    d.title = data.title or ""
+    d.content = data.content
+    d.date = data.date or ""
+    d.updated_at = datetime.now()
+    session.commit()
+    result = _draft_dict(d)
+    session.close()
+    return result
+
+
+@app.delete("/drafts/{draft_id}")
+def delete_draft(draft_id: int):
+    session = Session()
+    d = session.query(Draft).filter(Draft.id == draft_id).first()
+    if not d:
+        session.close()
+        raise HTTPException(status_code=404, detail="草稿不存在")
+    session.delete(d)
+    session.commit()
+    session.close()
+    return {"ok": True}
 
 
 @app.delete("/essays/{essay_id}")

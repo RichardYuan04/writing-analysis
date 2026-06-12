@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getPortrait, essayDeepAnalysis } from '../api'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import EssayPicker from '../components/EssayPicker'
+import SoulDocPanel from '../components/SoulDocPanel'
 import {
   AuthorCard, WordCloudPanel, DimensionsPanel,
   StructureTimeline, KeyPointsPanel, SentimentBar,
@@ -55,6 +56,8 @@ export default function Portrait() {
       <h1 className="portrait-title">你的写作画像</h1>
       <p className="portrait-sub">基于你全部随笔的本地分析，无数据上传</p>
 
+      <SoulDocPanel />
+
       {/* 雷达图 */}
       <div className="section">
         <h2>写作维度雷达</h2>
@@ -101,9 +104,9 @@ export default function Portrait() {
 
         {deepError && (
           <div style={{
-            marginTop: 16, padding: '12px 16px', background: '#fff5f5',
-            border: '1px solid #fecaca', borderRadius: 8,
-            fontSize: 13, color: '#dc2626',
+            marginTop: 16, padding: '12px 16px', background: 'color-mix(in srgb, #e07a6a 12%, transparent)',
+            border: '1px solid color-mix(in srgb, #e07a6a 40%, transparent)', borderRadius: 8,
+            fontSize: 13, color: '#e07a6a',
           }}>
             {deepError}
           </div>
@@ -111,7 +114,7 @@ export default function Portrait() {
 
         {deepResult && (
           <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 13, color: '#aaa', borderBottom: '1px solid #ede6da', paddingBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 13, color: 'var(--text-hint)', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
               《{analyzedTitle}》分析结果
             </div>
             <AuthorCard persona={deepResult.literaryPersona} />
@@ -154,7 +157,8 @@ function SoulWordsByPos({ data }) {
         return (
           <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <span style={{
-              fontSize: 10, color: '#a89070', letterSpacing: '0.1em',
+              fontFamily: 'var(--font-display)', fontStyle: 'italic',
+              fontSize: 11, color: 'var(--accent)', letterSpacing: '0.06em',
               whiteSpace: 'nowrap', width: 36, flexShrink: 0,
             }}>{label}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

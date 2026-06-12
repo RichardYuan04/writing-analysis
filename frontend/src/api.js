@@ -20,6 +20,10 @@ export const assistExpand = (data) => api.post('/assist/expand', data)
 export const getPortrait = () => api.get('/stats/portrait')
 export const deepAnalysis = () => api.post('/stats/deep-analysis')
 
+export const getStyleProfile = () => api.get('/style-profile')
+export const generateStyleProfile = (essayIds) => api.post('/style-profile/generate', { essay_ids: essayIds })
+export const saveStyleProfile = (content) => api.put('/style-profile', { content })
+
 export const getOverview = (startDate, endDate) => {
   const params = {}
   if (startDate) params.start_date = startDate
@@ -53,3 +57,8 @@ export const listFragments = (category, hiddenOnly = false) => {
 }
 export const listThemes = () => api.get('/vault/themes')
 export const updateFragmentFeedback = (id, data) => api.patch(`/vault/fragments/${id}`, data)
+
+export const listDrafts = () => api.get('/drafts')
+export const createDraft = (data) => api.post('/drafts', data)
+export const updateDraft = (id, data) => api.put(`/drafts/${id}`, data)
+export const deleteDraft = (id) => api.delete(`/drafts/${id}`)
