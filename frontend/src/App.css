@@ -309,7 +309,7 @@
 
 /* ── 写作工具面板 ── */
 .assist-panel {
-  width: 300px; flex-shrink: 0; position: sticky; top: 20px;
+  width: 300px; flex-shrink: 0;
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: 14px 16px;
 }
@@ -644,13 +644,17 @@
 .soul-rationale-k { width: 64px; flex-shrink: 0; color: #a89070; }
 .soul-rationale-v { color: #5a4a3a; }
 
-/* 写作页右列：写作工具 + 草稿箱 竖向堆叠 */
-.write-right { display: flex; flex-direction: column; gap: 14px; }
+/* 写作页右列：写作工具 + 草稿箱 竖向堆叠；整列一起 sticky，避免面板间重叠 */
+.write-right {
+  display: flex; flex-direction: column; gap: 14px;
+  flex-shrink: 0; position: sticky; top: 20px;
+}
 
 /* 草稿箱面板 */
 .draft-panel {
+  width: 300px; box-sizing: border-box;
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px; align-self: flex-start;
+  border-radius: 12px; padding: 14px;
 }
 .draft-panel.collapsed { padding: 8px; text-align: center; }
 .dp-expand, .dp-collapse {
