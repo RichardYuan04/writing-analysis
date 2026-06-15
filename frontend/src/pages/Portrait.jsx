@@ -56,8 +56,6 @@ export default function Portrait() {
       <h1 className="portrait-title">你的写作画像</h1>
       <p className="portrait-sub">基于你全部随笔的本地分析，无数据上传</p>
 
-      <SoulDocPanel />
-
       {/* 雷达图 */}
       <div className="section">
         <h2>写作维度雷达</h2>
@@ -69,6 +67,8 @@ export default function Portrait() {
           </RadarChart>
         </ResponsiveContainer>
       </div>
+
+      <SoulDocPanel />
 
       {/* 灵魂词汇（按词性分类） */}
       {portrait.soul_words_by_pos && (
@@ -155,11 +155,10 @@ function SoulWordsByPos({ data }) {
         const words = data[key] || []
         if (words.length === 0) return null
         return (
-          <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{
               fontFamily: 'var(--font-display)', fontStyle: 'italic',
               fontSize: 11, color: 'var(--accent)', letterSpacing: '0.06em',
-              whiteSpace: 'nowrap', width: 36, flexShrink: 0,
             }}>{label}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {words.map(w => (

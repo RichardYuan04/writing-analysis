@@ -639,6 +639,12 @@ def _ctx_line(ctx: str) -> str:
     return f"\n上下文（前后各一句）：{ctx}" if ctx else ""
 
 
+def _cap(text: str, factor: float, lo: int, hi: int) -> int:
+    """按选中文字长度自适应 max_tokens：避免长选区被截断，同时设上限防跑飞。
+    factor 大致是「输出相对输入的倍数」（多候选时要乘候选数）。中文约 1 字≈1 token。"""
+    return max(lo, min(hi, int(len(text or "") * factor) + 120))
+
+
 @app.post("/assist/reduce")
 def assist_reduce(data: AssistRequest):
     user = (
@@ -646,7 +652,7 @@ def assist_reduce(data: AssistRequest):
         "要求：保留核心意思和情感，删去冗余表达，保持作者的句式风格，直接输出压缩后的文字。\n\n"
         f"原文：{data.text.strip()}"
     )
-    return _assist_call(data, user, max_tokens=512, parse_options=False, model="claude-haiku-4-5-20251001")
+    return _assist_call(data, user, max_tokens=_cap(data.text, 1.5, 256, 1024), parse_options=False, model="claude-haiku-4-5-20251001")
 
 
 @app.post("/assist/synonyms")
@@ -656,7 +662,7 @@ def assist_synonyms(data: AssistRequest):
         "要求：保持原意，贴合上下文语境，风格与作者一致，每个选项单独一行，不要额外解释。\n\n"
         f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=300, parse_options=True, model="claude-sonnet-4-6")
+    return _assist_call(data, user, max_tokens=_cap(data.text, 4, 320, 2048), parse_options=True, model="claude-sonnet-4-6")
 
 
 METAPHOR_SYSTEM = (
@@ -678,7 +684,7 @@ def assist_metaphor(data: AssistRequest):
         "4. 每个比喻单独一行，直接输出。\n\n"
         f"选中文字：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=400, parse_options=True,
+    return _assist_call(data, user, max_tokens=_cap(data.text, 1.5, 400, 1024), parse_options=True,
                         model="claude-opus-4-8", system=METAPHOR_SYSTEM)
 
 
@@ -689,7 +695,7 @@ def assist_expand(data: AssistRequest):
         "要求：补充细节、感受或场景描写，自然融入原文语境，保持作者风格，直接输出扩展后的文字。\n\n"
         f"原文：{data.text.strip()}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=700, parse_options=False, model="claude-sonnet-4-6")
+    return _assist_call(data, user, max_tokens=_cap(data.text, 3, 512, 2048), parse_options=False, model="claude-sonnet-4-6")
 
 
 # ── 风格 SOUL 文档 ──
@@ -1121,9 +1127,21 @@ def compute_portrait(essays):
             cross_count[pos][word] += 1
 
     threshold = max(2, len(essays) // 3)
-    soul_words_nouns = [w for w, c in cross_count["n"].most_common(30) if c >= threshold][:10]
-    soul_words_verbs = [w for w, c in cross_count["v"].most_common(30) if c >= threshold][:10]
-    soul_words_adjs  = [w for w, c in cross_count["a"].most_common(30) if c >= threshold][:10]
+
+    def _pick_pos(counter, n=10):
+        # 门槛优先（跨篇复现 >= threshold），不足 n 个时按高频补满
+        picked = [w for w, c in counter.most_common(30) if c >= threshold]
+        if len(picked) < n:
+            for w, _ in counter.most_common(n):
+                if w not in picked:
+                    picked.append(w)
+                if len(picked) >= n:
+                    break
+        return picked[:n]
+
+    soul_words_nouns = _pick_pos(cross_count["n"])
+    soul_words_verbs = _pick_pos(cross_count["v"])
+    soul_words_adjs  = _pick_pos(cross_count["a"])
     # 兼容旧字段：合并列表
     soul_words = soul_words_nouns + soul_words_verbs + soul_words_adjs
     return {
