@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createEssay, moodReply, deleteDraft } from '../api'
 import MoodCard from '../components/MoodCard'
 import AssistPanel from '../components/AssistPanel'
 import DraftPanel from '../components/DraftPanel'
+import RichEditor from '../components/RichEditor'
+import { blocksToPlainText, plainTextToBlocks, parseRich } from '../components/richSchema'
 import QUOTES from '../data/quotes'
 
 const DRAFT_KEY = 'wt_write_draft'
 
-// 按时段给问候
 function daily() {
   const h = new Date().getHours()
   if (h >= 5 && h < 11) return { emoji: '☀️', hello: '早。' }
@@ -15,7 +16,6 @@ function daily() {
   return { emoji: '🌙', hello: '夜深了。' }
 }
 
-// 随机取一句金句（尽量不和上一句重复）
 function pickQuote(prev) {
   if (QUOTES.length <= 1) return QUOTES[0]
   let q
@@ -25,55 +25,51 @@ function pickQuote(prev) {
 
 export default function Write({ onSaved, prefill, onBack }) {
   const today = new Date().toISOString().split('T')[0]
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [date, setDate] = useState(today)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
-  const [autoState, setAutoState] = useState('idle')   // idle | saving | saved
-  const [autoAt, setAutoAt] = useState('')
-  const [dailyShown, setDailyShown] = useState(true)
-  const [mood, setMood] = useState(null)               // 保存后浮出的心绪卡
-
-  const contentRef = useRef(null)
-  const moodRef = useRef(null)
-  const savingRef = useRef(false)   // 同步防重入，挡住快速连点导致的重复创建
-  const hydratedRef = useRef(false) // 首次挂载（可能正从本地恢复草稿）时不清空，避免误删
-  const [confirmClear, setConfirmClear] = useState(false)  // 站内「清空」确认框
-  const [greeting] = useState(daily)
-  const [quote, setQuote] = useState(() => pickQuote(null))
-  const [sel, setSel] = useState(null)            // 当前选区 {start,end,text}
-  const [panelCollapsed, setPanelCollapsed] = useState(false)
-  const [undoStack, setUndoStack] = useState([])  // 替换前整篇正文快照栈
-  const [draftId, setDraftId] = useState(null)            // 当前正在编辑的草稿 id
-  const [draftPanelCollapsed, setDraftPanelCollapsed] = useState(false)
-
-  // 初始化：prefill（来自仓库）优先；否则尝试恢复本地草稿
-  useEffect(() => {
-    if (prefill) {
-      setContent(prefill)
-      return
-    }
+  // 初始内容只算一次：prefill 优先，其次本地草稿（兼容旧的纯文本草稿）
+  const [init] = useState(() => {
+    if (prefill) return { blocks: plainTextToBlocks(prefill), title: '', date: today, at: '', restored: false }
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (raw) {
         const d = JSON.parse(raw)
-        if (d.title) setTitle(d.title)
-        if (d.content) setContent(d.content)
-        if (d.date) setDate(d.date)
-        if (d.title || d.content) { setAutoState('saved'); setAutoAt(d.at || '') }
+        const blocks = (d.blocks && d.blocks.length) ? d.blocks : (d.content ? plainTextToBlocks(d.content) : undefined)
+        return { blocks, title: d.title || '', date: d.date || today, at: d.at || '', restored: !!(d.title || d.content || (d.blocks && d.blocks.length)) }
       }
     } catch { /* ignore */ }
-  }, [prefill])
+    return { blocks: undefined, title: '', date: today, at: '', restored: false }
+  })
 
-  // 无感自动保存（节流写 localStorage），不打断输入
+  const [title, setTitle] = useState(init.title)
+  const [date, setDate] = useState(init.date)
+  const [docBlocks, setDocBlocks] = useState(init.blocks || [{ type: 'paragraph', content: [] }])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const [autoState, setAutoState] = useState(init.restored ? 'saved' : 'idle')
+  const [autoAt, setAutoAt] = useState(init.at)
+  const [dailyShown, setDailyShown] = useState(true)
+  const [mood, setMood] = useState(null)
+
+  const richRef = useRef(null)
+  const moodRef = useRef(null)
+  const savingRef = useRef(false)
+  const hydratedRef = useRef(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [greeting] = useState(daily)
+  const [quote, setQuote] = useState(() => pickQuote(null))
+  const [sel, setSel] = useState(null)
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
+  const [undoStack, setUndoStack] = useState([])
+  const [draftId, setDraftId] = useState(null)
+  const [draftPanelCollapsed, setDraftPanelCollapsed] = useState(false)
+
+  const plainText = useMemo(() => blocksToPlainText(docBlocks), [docBlocks])
+
+  // 无感自动保存（节流写 localStorage）
   useEffect(() => {
-    if (mood) return                       // 已保存、展示心绪卡时不再写草稿
-    if (!title && !content) {
-      // 内容被清空（删到空）：复位状态并清掉本地草稿，回到「尚未开始」。
-      // 首次挂载时可能正从 localStorage 恢复草稿（恢复 effect 已读到内存里），
-      // 这一跑不要清，否则会把刚恢复的草稿误删。
+    if (mood) return
+    if (!title.trim() && !plainText.trim()) {
       if (!hydratedRef.current) { hydratedRef.current = true; return }
       setAutoState('idle'); setAutoAt('')
       localStorage.removeItem(DRAFT_KEY)
@@ -83,95 +79,64 @@ export default function Write({ onSaved, prefill, onBack }) {
     setAutoState('saving')
     const t = setTimeout(() => {
       const at = new Date().toTimeString().slice(0, 5)
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, content, date, at }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, blocks: docBlocks, date, at }))
       setAutoState('saved'); setAutoAt(at)
     }, 800)
     return () => clearTimeout(t)
-  }, [title, content, date, mood])
+  }, [title, docBlocks, date, mood, plainText])
 
-  const nextQuote = () => setQuote(q => pickQuote(q))
+  const nextQuote = () => setQuote((q) => pickQuote(q))
 
-  // 取选区前后各一句作为上下文（给同义/比喻/扩展用）
-  const ctxOf = (full, start, end) => {
-    const SEP = /[。！？!?\n]/
-    const before = full.slice(0, start).split(SEP)
-    const after = full.slice(end).split(SEP)
-    const prev = (before[before.length - 1] || '').trim()
-    const next = (after[0] || '').trim()
-    return [prev, next].filter(Boolean).join(' … ')
-  }
-
-  // 正文选区变化 → 同步给右侧面板（≥4 字才算有效选中）
-  const onContentSelect = (e) => {
-    const el = e.target
-    const { selectionStart: s, selectionEnd: t, value } = el
-    const text = value.slice(s, t)
-    if (text.trim().length >= 4) {
-      setSel({ start: s, end: t, text, context: ctxOf(value, s, t) })
-    } else {
-      setSel(null)
-    }
-  }
-
-  // 用 AI 结果替换指定区间；替换前把整篇压入撤回栈
+  // AI 划词改写：用编辑器选区范围替换；替换前压入快照栈
   const applyAssist = (range, newText) => {
-    if (!range) return
-    setUndoStack(s => [...s, content])
-    setContent(content.slice(0, range.start) + newText + content.slice(range.end))
+    if (!range || !richRef.current) return
+    setUndoStack((s) => [...s, richRef.current.snapshot()])
+    richRef.current.replaceRange(range.from, range.to, newText)
     setSel(null)
-    // 替换后把选区设到「新文字」范围：既高亮提示改了哪段，又让视图滚到此处。
-    // （此前只调 focus() 不设选区，光标默认落到文末，导致正文滚到最底部——就是那个 bug）
-    const newStart = range.start
-    const newEnd = range.start + newText.length
-    setTimeout(() => {
-      const el = contentRef.current
-      if (!el) return
-      el.focus()
-      try { el.setSelectionRange(newStart, newEnd) } catch { /* 忽略 */ }
-    }, 0)
   }
-
-  // 撤回最近一次替换：还原整篇到替换前快照
   const undoLast = () => {
-    setUndoStack(s => {
+    setUndoStack((s) => {
       if (!s.length) return s
-      setContent(s[s.length - 1])
+      richRef.current?.restore(s[s.length - 1])
       return s.slice(0, -1)
     })
   }
 
-  // 点开草稿箱里的某份 → 载入编辑器继续写
+  // 点开草稿箱里的某份 → 载入编辑器
   const openDraft = (d) => {
+    const blocks = parseRich(d.content_rich, d.content)
     setTitle(d.title || '')
-    setContent(d.content || '')
     setDate(d.date || today)
     setDraftId(d.id)
     setMood(null)
     setSel(null)
     setUndoStack([])
+    richRef.current?.setBlocks(blocks)
+    setDocBlocks(blocks)
     setAutoState('saved')
-    setTimeout(() => contentRef.current?.focus(), 0)
+    setTimeout(() => richRef.current?.focus(), 0)
   }
 
-  // 清空当前编辑器：先弹站内确认框；不影响草稿箱里已存的草稿
+  // 清空：站内确认框
   const requestClear = () => {
-    if (!title && !content) return
+    if (!title.trim() && !plainText.trim()) return
     setConfirmClear(true)
   }
   const doClear = () => {
     setConfirmClear(false)
     setTitle('')
-    setContent('')
     setDate(today)
     setDraftId(null)
     setSel(null)
     setUndoStack([])
     setMood(null)
+    const empty = [{ type: 'paragraph', content: [] }]
+    richRef.current?.setBlocks(empty)
+    setDocBlocks(empty)
     setAutoState('idle'); setAutoAt('')
     localStorage.removeItem(DRAFT_KEY)
   }
 
-  // 确认框打开时支持 Esc 关闭
   useEffect(() => {
     if (!confirmClear) return
     const onKey = (e) => { if (e.key === 'Escape') setConfirmClear(false) }
@@ -180,23 +145,22 @@ export default function Write({ onSaved, prefill, onBack }) {
   }, [confirmClear])
 
   const handleSave = async () => {
-    if (savingRef.current || mood) return   // 防重入 + 已保存(卡片已出)不再创建
-    if (!title.trim() || !content.trim()) { setError('标题和内容不能为空'); return }
+    if (savingRef.current || mood) return
+    if (!title.trim() || !plainText.trim()) { setError('标题和内容不能为空'); return }
     savingRef.current = true
     setSaving(true); setError('')
     try {
-      const res = await createEssay({ title, content, date })
+      const res = await createEssay({
+        title, content: plainText, date, content_rich: JSON.stringify(docBlocks),
+      })
       localStorage.removeItem(DRAFT_KEY)
       if (draftId) { try { await deleteDraft(draftId) } catch { /* ignore */ } setDraftId(null) }
-      // 后端旧版/未返回心绪卡时，退回原行为（保存后离开），不渲染空卡
       if (!res.data.mood_card || !res.data.mood_card.tone) { onSaved(); return }
       setMood({ id: res.data.id, ...res.data.mood_card })
-      // 滚动到卡片，让"保存成功"可见
       setTimeout(() => moodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
-      // 异步补那句 AI 回应
       moodReply(res.data.id)
-        .then(r => setMood(m => (m && m.id === res.data.id ? { ...m, ...r.data } : m)))
-        .catch(() => setMood(m => (m ? { ...m, ai_reply_status: 'error' } : m)))
+        .then((r) => setMood((m) => (m && m.id === res.data.id ? { ...m, ...r.data } : m)))
+        .catch(() => setMood((m) => (m ? { ...m, ai_reply_status: 'error' } : m)))
     } catch {
       setError('保存失败，请检查后端是否启动')
     } finally {
@@ -205,104 +169,95 @@ export default function Write({ onSaved, prefill, onBack }) {
     }
   }
 
+  const wordCount = plainText.replace(/\s/g, '').length
+
   return (
     <div className="write-layout">
       <div className="write-page">
-      <div className="write-top">
-        {onBack && <button className="back-btn" onClick={onBack}>← 返回仓库</button>}
-        <span className={`auto-state ${autoState}`}>
-          <span className="auto-dot" />
-          {autoState === 'saving' ? '保存中…'
-            : autoState === 'saved' ? `已自动保存${autoAt ? ' · ' + autoAt : ''}`
-            : '尚未开始'}
-        </span>
-      </div>
+        <div className="write-top">
+          {onBack && <button className="back-btn" onClick={onBack}>← 返回仓库</button>}
+          <span className={`auto-state ${autoState}`}>
+            <span className="auto-dot" />
+            {autoState === 'saving' ? '保存中…'
+              : autoState === 'saved' ? `已自动保存${autoAt ? ' · ' + autoAt : ''}`
+              : '尚未开始'}
+          </span>
+        </div>
 
-      {dailyShown && !mood && (
-        <div className="daily-q">
-          <button className="daily-x" onClick={() => setDailyShown(false)}>✕</button>
-          <div className="daily-hello">{greeting.emoji} {greeting.hello}</div>
-          <blockquote className="daily-quote">{quote.t}</blockquote>
-          <div className="daily-row">
-            <span className="daily-cite">
-              — {quote.a}{quote.s ? `《${quote.s}》` : ''}
-            </span>
-            <button className="daily-next" onClick={nextQuote}>换一句</button>
+        {dailyShown && !mood && (
+          <div className="daily-q">
+            <button className="daily-x" onClick={() => setDailyShown(false)}>✕</button>
+            <div className="daily-hello">{greeting.emoji} {greeting.hello}</div>
+            <blockquote className="daily-quote">{quote.t}</blockquote>
+            <div className="daily-row">
+              <span className="daily-cite">— {quote.a}{quote.s ? `《${quote.s}》` : ''}</span>
+              <button className="daily-next" onClick={nextQuote}>换一句</button>
+            </div>
           </div>
-        </div>
-      )}
-
-      <div className="write-header">
-        <input
-          className="title-input"
-          placeholder="标题…"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-        />
-        <input
-          type="date"
-          className="date-input"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-        />
-      </div>
-      <textarea
-        ref={contentRef}
-        className="content-input"
-        placeholder="开始写作…"
-        value={content}
-        onChange={e => setContent(e.target.value)}
-        onSelect={onContentSelect}
-      />
-      <div className="write-footer">
-        <span className="word-count">{content.replace(/\s/g, '').length} 字</span>
-        {error && <span className="error">{error}</span>}
-        {mood ? (
-          <span className="saved-flag">已保存 ✓</span>
-        ) : (
-          <>
-            <button className="clear-btn" onClick={requestClear} disabled={!title && !content}>清空</button>
-            <button className="save-btn" onClick={handleSave} disabled={saving}>
-              {saving ? '保存中…' : '保存'}
-            </button>
-          </>
         )}
-      </div>
 
-      {mood && (
-        <div ref={moodRef}>
-          <MoodCard
-            mood={mood}
-            onDismiss={() => { setMood(null); onSaved() }}
-            floating
+        <div className="write-header">
+          <input
+            className="title-input"
+            placeholder="标题…"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
           />
+          <input type="date" className="date-input" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
-      )}
+
+        <RichEditor
+          ref={richRef}
+          initialContent={init.blocks}
+          onChange={setDocBlocks}
+          onSelectionChange={setSel}
+        />
+
+        <div className="write-footer">
+          <span className="word-count">{wordCount} 字</span>
+          {error && <span className="error">{error}</span>}
+          {mood ? (
+            <span className="saved-flag">已保存 ✓</span>
+          ) : (
+            <>
+              <button className="clear-btn" onClick={requestClear} disabled={!title.trim() && !plainText.trim()}>清空</button>
+              <button className="save-btn" onClick={handleSave} disabled={saving}>
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {mood && (
+          <div ref={moodRef}>
+            <MoodCard mood={mood} onDismiss={() => { setMood(null); onSaved() }} floating />
+          </div>
+        )}
       </div>
 
       <div className="write-right">
         <AssistPanel
           sel={sel}
           collapsed={panelCollapsed}
-          onToggle={() => setPanelCollapsed(c => !c)}
+          onToggle={() => setPanelCollapsed((c) => !c)}
           onApply={applyAssist}
           onUndo={undoLast}
           canUndo={undoStack.length > 0}
         />
         <DraftPanel
-          current={{ title, content, date }}
+          current={{ title, content: plainText, date, content_rich: JSON.stringify(docBlocks) }}
           draftId={draftId}
           onSaved={(d) => setDraftId(d.id)}
           onOpen={openDraft}
           onDraftRemoved={() => setDraftId(null)}
           collapsed={draftPanelCollapsed}
-          onToggle={() => setDraftPanelCollapsed(c => !c)}
+          onToggle={() => setDraftPanelCollapsed((c) => !c)}
         />
       </div>
 
       {confirmClear && (
         <div className="modal-overlay" onClick={() => setConfirmClear(false)}>
-          <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">清空当前内容？</div>
             <p className="modal-msg">编辑区里的标题和正文会被清掉，回到「尚未开始」。<br />此操作不影响已存入草稿箱的草稿。</p>
             <div className="modal-acts">
