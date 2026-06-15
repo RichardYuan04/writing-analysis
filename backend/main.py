@@ -67,6 +67,7 @@ class Essay(Base):
     sentiment_negative = Column(Float)
     emotion_detail = Column(Text)   # JSON: {joy, gratitude, love, neutral, surprise, anger, ...}
     mood_card = Column(Text)        # JSON: {tone, tone_emoji, keywords[], ai_reply, ai_reply_status, generated_at}
+    content_rich = Column(Text)     # JSON: BlockNote 块文档（富文本）；content 仍存纯文本供分析/搜索
     created_at = Column(DateTime, default=datetime.now)
 
 
@@ -85,6 +86,7 @@ class Draft(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(200))
     content = Column(Text)
+    content_rich = Column(Text)                   # JSON: BlockNote 块文档
     date = Column(String(10))                    # YYYY-MM-DD（用户设定的写作日期）
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now)
@@ -139,12 +141,19 @@ def migrate_db():
             ("sentiment_negative", "FLOAT"),
             ("emotion_detail",     "TEXT"),
             ("mood_card",          "TEXT"),
+            ("content_rich",       "TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE essays ADD COLUMN {col} {typ}"))
                 conn.commit()
             except Exception:
                 pass  # 列已存在
+        # drafts 表补列
+        try:
+            conn.execute(text("ALTER TABLE drafts ADD COLUMN content_rich TEXT"))
+            conn.commit()
+        except Exception:
+            pass  # 列已存在
 
 
 def compute_emotion_breakdown(content: str):
@@ -292,6 +301,7 @@ class EssayCreate(BaseModel):
     title: str
     content: str
     date: str
+    content_rich: str | None = None
 
 
 @app.post("/essays")
@@ -303,6 +313,7 @@ def create_essay(data: EssayCreate):
     essay = Essay(
         title=data.title,
         content=data.content,
+        content_rich=data.content_rich,
         date=data.date,
         word_count=analysis["word_count"],
         sentiment_score=em.get("sentiment_score", 0.5),
@@ -415,6 +426,7 @@ def get_essay(essay_id: int):
         "id": essay.id,
         "title": essay.title,
         "content": essay.content,
+        "content_rich": essay.content_rich,
         "date": essay.date,
         "sentiment": essay.sentiment_score,
         "emotion_detail": json.loads(essay.emotion_detail) if essay.emotion_detail else None,
@@ -429,6 +441,7 @@ class EssayUpdate(BaseModel):
     title: str
     content: str
     date: str
+    content_rich: str | None = None
 
 
 @app.put("/essays/{essay_id}")
@@ -443,6 +456,7 @@ def update_essay(essay_id: int, data: EssayUpdate):
     mood = compute_mood_card(data.content, em=em, analysis=analysis)  # 最新一张覆盖
     essay.title = data.title
     essay.content = data.content
+    essay.content_rich = data.content_rich
     essay.date = data.date
     essay.word_count = analysis["word_count"]
     essay.sentiment_score    = em.get("sentiment_score", 0.5)
@@ -852,6 +866,7 @@ class DraftRequest(BaseModel):
     title: str = ""
     content: str
     date: str = ""
+    content_rich: str | None = None
 
 
 def _draft_dict(d) -> dict:
@@ -859,6 +874,7 @@ def _draft_dict(d) -> dict:
         "id": d.id,
         "title": d.title or "",
         "content": d.content or "",
+        "content_rich": d.content_rich,
         "date": d.date or "",
         "created_at": d.created_at.isoformat() if d.created_at else None,
         "updated_at": d.updated_at.isoformat() if d.updated_at else None,
@@ -871,8 +887,8 @@ def create_draft(data: DraftRequest):
         raise HTTPException(status_code=400, detail="草稿内容不能为空")
     session = Session()
     now = datetime.now()
-    d = Draft(title=data.title or "", content=data.content, date=data.date or "",
-              created_at=now, updated_at=now)
+    d = Draft(title=data.title or "", content=data.content, content_rich=data.content_rich,
+              date=data.date or "", created_at=now, updated_at=now)
     session.add(d)
     session.commit()
     result = _draft_dict(d)
@@ -898,6 +914,7 @@ def update_draft(draft_id: int, data: DraftRequest):
         raise HTTPException(status_code=404, detail="草稿不存在")
     d.title = data.title or ""
     d.content = data.content
+    d.content_rich = data.content_rich
     d.date = data.date or ""
     d.updated_at = datetime.now()
     session.commit()

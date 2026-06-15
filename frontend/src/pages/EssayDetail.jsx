@@ -1,23 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getEssay, deleteEssay, updateEssay } from '../api'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import WordCloud from '../components/WordCloud'
 import MoodCard from '../components/MoodCard'
+import RichEditor from '../components/RichEditor'
+import RichViewer from '../components/RichViewer'
+import { blocksToPlainText, parseRich } from '../components/richSchema'
 
 export default function EssayDetail({ id, onBack }) {
   const [essay, setEssay] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
-  const [editContent, setEditContent] = useState('')
+  const [editDocBlocks, setEditDocBlocks] = useState(null)
   const [editDate, setEditDate] = useState('')
   const [saving, setSaving] = useState(false)
+  const richRef = useRef(null)
 
   useEffect(() => {
     getEssay(id).then(r => {
       setEssay(r.data)
       setEditTitle(r.data.title)
-      setEditContent(r.data.content)
+      setEditDocBlocks(parseRich(r.data.content_rich, r.data.content))
       setEditDate(r.data.date)
       setLoading(false)
     })
@@ -33,7 +37,13 @@ export default function EssayDetail({ id, onBack }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const res = await updateEssay(id, { title: editTitle, content: editContent, date: editDate })
+      const blocks = richRef.current ? richRef.current.getDoc() : editDocBlocks
+      const res = await updateEssay(id, {
+        title: editTitle,
+        content: blocksToPlainText(blocks),
+        date: editDate,
+        content_rich: JSON.stringify(blocks),
+      })
       setEssay(res.data)
       setEditing(false)
     } finally {
@@ -43,7 +53,7 @@ export default function EssayDetail({ id, onBack }) {
 
   const handleCancelEdit = () => {
     setEditTitle(essay.title)
-    setEditContent(essay.content)
+    setEditDocBlocks(parseRich(essay.content_rich, essay.content))
     setEditDate(essay.date)
     setEditing(false)
   }
@@ -97,14 +107,13 @@ export default function EssayDetail({ id, onBack }) {
               onChange={e => setEditDate(e.target.value)}
             />
           </div>
-          <textarea
-            className="content-input"
-            style={{ minHeight: 480, width: '100%', resize: 'vertical' }}
-            value={editContent}
-            onChange={e => setEditContent(e.target.value)}
+          <RichEditor
+            ref={richRef}
+            initialContent={editDocBlocks || undefined}
+            onChange={setEditDocBlocks}
           />
           <div className="write-footer">
-            <span className="word-count">{editContent.replace(/\s/g, '').length} 字</span>
+            <span className="word-count">{blocksToPlainText(editDocBlocks || []).replace(/\s/g, '').length} 字</span>
           </div>
         </div>
       ) : (
@@ -116,7 +125,9 @@ export default function EssayDetail({ id, onBack }) {
             <span>{sentimentLabel(essay.sentiment)}</span>
             <span>情感分: {essay.sentiment?.toFixed(2)}</span>
           </div>
-          <div className="detail-content">{essay.content}</div>
+          <div className="detail-content detail-rich">
+            <RichViewer key={essay.id} blocks={parseRich(essay.content_rich, essay.content)} />
+          </div>
 
           {essay.mood_card && (
             <MoodCard mood={essay.mood_card} variant="persisted" />

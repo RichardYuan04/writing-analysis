@@ -57,6 +57,60 @@
   transition: all 0.3s;
 }
 .theme-toggle:hover { border-color: var(--accent) !important; color: var(--accent) !important; background: var(--panel) !important; }
+.nav-gear {
+  margin-left: 6px; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text-secondary);
+  border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center; transition: all 0.3s;
+}
+.nav-gear:hover { border-color: var(--accent); color: var(--accent); transform: rotate(40deg); }
+.nav-gear.active { border-color: var(--accent); color: var(--accent); }
+
+/* ── 设置页 ── */
+.settings-page { animation: fadeUp 0.5s cubic-bezier(.2,.8,.2,1); }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.set-label { font-family: var(--font-display); font-style: italic; font-size: 13px; color: var(--accent); margin-bottom: 10px; }
+
+.family-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (max-width: 560px) { .family-grid { grid-template-columns: 1fr; } }
+.family-card {
+  position: relative; text-align: left; cursor: pointer;
+  background: var(--card-grad); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+  transition: transform 0.3s cubic-bezier(.2,.8,.2,1), border-color 0.3s, box-shadow 0.3s;
+}
+.family-card:hover { transform: translateY(-2px); border-color: var(--accent-light); }
+.family-card.active { border-color: var(--accent); box-shadow: var(--shadow-glow); }
+.family-swatch { display: flex; gap: 5px; margin-bottom: 4px; }
+.family-swatch i { width: 30px; height: 16px; border-radius: 4px; display: block; border: 1px solid rgba(0,0,0,.12); }
+.family-name { font-family: var(--font-serif); font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.family-sub { font-family: var(--font-display); font-style: italic; font-size: 12.5px; color: var(--text-hint); }
+.family-check {
+  position: absolute; top: 12px; right: 14px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent); font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.mode-switch { display: inline-flex; gap: 2px; background: var(--panel2); border: 1px solid var(--border); border-radius: 40px; padding: 3px; }
+.mode-switch button {
+  border: none; background: none; cursor: pointer; font-size: 13px; padding: 7px 20px; border-radius: 40px;
+  color: var(--text-secondary); font-family: var(--font-sans); transition: all 0.25s;
+}
+.mode-switch button.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+.set-current { margin-top: 18px; font-size: 13px; color: var(--text-hint); }
+.set-current b { font-family: var(--font-serif); color: var(--text-primary); }
+.set-current-sep { margin: 0 8px; color: var(--border); }
+.set-current-name { font-family: var(--font-serif); color: var(--accent); }
+
+.set-soon { opacity: 0.92; }
+.soon-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.soon-list li { font-size: 13.5px; color: var(--text-secondary); line-height: 1.7; }
+.soon-tag {
+  display: inline-block; margin-right: 8px; font-size: 11px; color: var(--accent);
+  border: 1px dashed var(--accent-light); border-radius: 20px; padding: 2px 10px;
+  font-family: var(--font-display);
+}
 
 /* ── 页面容器 ── */
 .main { max-width: 800px; margin: 0 auto; padding: 36px 20px; }
@@ -624,18 +678,13 @@
 .word { flex: 1; font-family: var(--font-serif); font-size: 14px; font-weight: 500; }
 .count { font-size: 12px; color: var(--text-hint); font-family: var(--font-display); }
 
-/* ── heatmap 配色（暖光梯度，主题感知）── */
+/* ── heatmap 配色：由主题色 accent 派生梯度，随色系/明暗自动适配 ── */
 .heatmap-wrapper { overflow-x: auto; }
-.react-calendar-heatmap .color-empty { fill: #2a1f14; }
-.react-calendar-heatmap .color-scale-1 { fill: #6b4f2a; }
-.react-calendar-heatmap .color-scale-2 { fill: #a8763a; }
-.react-calendar-heatmap .color-scale-3 { fill: #e89b50; }
-.react-calendar-heatmap .color-scale-4 { fill: #f3c781; }
-:root[data-theme="light"] .react-calendar-heatmap .color-empty { fill: #ece1cf; }
-:root[data-theme="light"] .react-calendar-heatmap .color-scale-1 { fill: #e0c79b; }
-:root[data-theme="light"] .react-calendar-heatmap .color-scale-2 { fill: #cf9a4f; }
-:root[data-theme="light"] .react-calendar-heatmap .color-scale-3 { fill: #c87a2e; }
-:root[data-theme="light"] .react-calendar-heatmap .color-scale-4 { fill: #9c5a1e; }
+.react-calendar-heatmap .color-empty { fill: var(--border-soft); }
+.react-calendar-heatmap .color-scale-1 { fill: color-mix(in srgb, var(--accent) 30%, var(--panel)); }
+.react-calendar-heatmap .color-scale-2 { fill: color-mix(in srgb, var(--accent) 55%, var(--panel)); }
+.react-calendar-heatmap .color-scale-3 { fill: color-mix(in srgb, var(--accent) 80%, var(--panel)); }
+.react-calendar-heatmap .color-scale-4 { fill: var(--accent); }
 .react-calendar-heatmap text { fill: var(--text-hint); font-size: 6px; }
 
 /* ── 今日回顾 ── */
@@ -832,3 +881,107 @@
 .modal-ghost:hover { border-color: var(--accent-light); color: var(--accent); }
 .modal-primary { border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .modal-primary:hover { box-shadow: 0 0 22px -6px var(--glow); filter: brightness(1.04); }
+
+/* ── 富文本编辑器（BlockNote）── */
+.rich-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  overflow: visible;
+}
+/* 顶栏：随页面滚动冻在导航下方（注意：类名不能用 bn- 前缀，会与 BlockNote 内部冲突）*/
+.rt-toolbar {
+  position: sticky; top: 60px; z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.rt-tb {
+  border: 1px solid transparent; background: none; color: var(--text-secondary);
+  cursor: pointer; font-size: 13px; padding: 5px 9px; border-radius: 6px;
+  font-family: var(--font-sans); transition: all 0.2s; line-height: 1;
+}
+.rt-tb:hover { background: var(--panel2); color: var(--accent); border-color: var(--border); }
+.rt-b { font-weight: 800; } .rt-i { font-style: italic; } .rt-s { text-decoration: line-through; } .rt-u { text-decoration: underline; }
+.rt-tb-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+.rt-caret { font-size: 10px; opacity: 0.7; }
+
+/* 顶栏下拉 */
+.rt-drop { position: relative; display: inline-flex; }
+.rt-drop-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow-card);
+}
+.rt-mi {
+  text-align: left; border: none; background: none; color: var(--text-primary);
+  font-size: 13px; padding: 7px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  font-family: var(--font-sans);
+}
+.rt-mi:hover { background: var(--panel2); color: var(--accent); }
+.rt-bgchip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 30%, transparent); vertical-align: -1px; margin-right: 2px; }
+
+/* 色板 */
+.rt-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.rt-swatch { width: 26px; height: 26px; border: 1px solid var(--border); background: var(--panel2); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.rt-swatch:hover { border-color: var(--accent); }
+.rt-swatch i { font-style: normal; font-weight: 700; font-size: 14px; font-family: var(--font-display); }
+.rt-swatch-bg { display: block; width: 16px; height: 16px; border-radius: 4px; border: 1px solid; }
+
+/* BlockNote 配色映射到主题 token */
+.bn-container {
+  --bn-colors-editor-text: var(--text-primary);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--text-primary);
+  --bn-colors-menu-background: var(--panel);
+  --bn-colors-tooltip-text: var(--text-secondary);
+  --bn-colors-tooltip-background: var(--panel2);
+  --bn-colors-hovered-text: var(--accent);
+  --bn-colors-hovered-background: var(--panel2);
+  --bn-colors-selected-text: var(--on-accent);
+  --bn-colors-selected-background: var(--accent);
+  --bn-colors-disabled-text: var(--text-hint);
+  --bn-colors-disabled-background: var(--panel2);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--text-hint);
+  --bn-colors-highlights-gray-background: var(--panel2);
+  background: transparent !important;
+  font-family: var(--font-serif);
+}
+.rich-wrap .bn-editor { min-height: 420px; padding-top: 8px; padding-bottom: 24px; }
+.rich-viewer .bn-editor { padding-left: 0; padding-right: 0; }
+.rich-viewer.bn-container { background: transparent !important; }
+/* 详情页正文容器内放只读富文本：去掉双重内边距 */
+.detail-rich { padding: 22px 26px; }
+.detail-rich .bn-editor { padding-left: 0 !important; padding-right: 0 !important; }
+
+/* 自定义块：Callout 提示框 */
+.rt-callout {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  border: 1px solid var(--accent-light); border-left: 3px solid var(--accent);
+  border-radius: 8px; padding: 10px 12px;
+}
+.rt-callout-ico { flex-shrink: 0; font-size: 16px; user-select: none; line-height: 1.6; }
+.rt-callout-body { flex: 1; min-width: 0; }
+
+/* 自定义块：Citation 引用 */
+.rt-citation {
+  margin: 0; border-left: 3px solid var(--accent-light);
+  padding: 6px 0 6px 14px; color: var(--text-secondary);
+  font-family: var(--font-serif); font-style: italic;
+}
+
+/* BlockNote 浮层/菜单的弹出层：保证可见、不被遮挡（如颜色「A」的下拉）*/
+.mantine-Menu-dropdown,
+.bn-menu-dropdown {
+  z-index: 100000 !important;
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-card) !important;
+}

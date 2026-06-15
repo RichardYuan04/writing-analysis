@@ -4,19 +4,28 @@ import Write from './pages/Write'
 import EssayDetail from './pages/EssayDetail'
 import Portrait from './pages/Portrait'
 import DraftVault from './pages/DraftVault'
+import Settings from './pages/Settings'
+import { DEFAULT_FAMILY, DEFAULT_MODE } from './themes'
 import './App.css'
 
 export default function App() {
   const [page, setPage] = useState('overview')
   const [selectedId, setSelectedId] = useState(null)
   const [writePrefill, setWritePrefill] = useState(null)
-  const [theme, setTheme] = useState(() => localStorage.getItem('wtm-theme') || 'dark')
+  // 主题两维：色系 + 明暗（明暗兼容旧的 wtm-theme 键）
+  const [family, setFamily] = useState(() => localStorage.getItem('wtm-family') || DEFAULT_FAMILY)
+  const [mode, setMode] = useState(
+    () => localStorage.getItem('wtm-mode') || localStorage.getItem('wtm-theme') || DEFAULT_MODE
+  )
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem('wtm-theme', theme)
-  }, [theme])
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+    const r = document.documentElement
+    r.dataset.family = family
+    r.dataset.mode = mode
+    localStorage.setItem('wtm-family', family)
+    localStorage.setItem('wtm-mode', mode)
+  }, [family, mode])
+  const toggleMode = () => setMode((m) => (m === 'dark' ? 'light' : 'dark'))
 
   const navigate = (p, id = null) => {
     setPage(p)
@@ -37,9 +46,15 @@ export default function App() {
           <button className={page === 'portrait' ? 'active' : ''} onClick={() => navigate('portrait')}>写作画像</button>
           <button className={page === 'vault' ? 'active' : ''} onClick={() => navigate('vault')}>半成品仓库</button>
           <button className={page === 'write' ? 'active' : ''} onClick={() => navigateToWrite()}>写作</button>
-          <button className="theme-toggle" onClick={toggleTheme} title="切换明暗">
-            {theme === 'dark' ? '☀ 白昼' : '☾ 夜晚'}
+          <button className="theme-toggle" onClick={toggleMode} title="切换明暗">
+            {mode === 'dark' ? '☀ 白昼' : '☾ 夜晚'}
           </button>
+          <button
+            className={`nav-gear ${page === 'settings' ? 'active' : ''}`}
+            onClick={() => navigate('settings')}
+            title="设置"
+            aria-label="设置"
+          >⚙</button>
         </div>
       </nav>
 
@@ -49,6 +64,9 @@ export default function App() {
         {page === 'vault' && <DraftVault onWrite={(prefill) => navigateToWrite(prefill)} />}
         {page === 'write' && <Write onSaved={() => navigate('overview')} prefill={writePrefill} onBack={writePrefill ? () => navigate('vault') : null} />}
         {page === 'detail' && <EssayDetail id={selectedId} onBack={() => navigate('overview')} />}
+        {page === 'settings' && (
+          <Settings family={family} mode={mode} onFamily={setFamily} onMode={setMode} />
+        )}
       </main>
     </div>
   )
