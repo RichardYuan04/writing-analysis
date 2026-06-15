@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>10 · 樱花 / 粉樱·绯紫 — 文字时光机</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300&family=Noto+Serif+SC:wght@300;400;500;600;700&family=Spectral:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"]{
+    --bg:#1a121a; --bg2:#221622; --panel:#2a1c2a; --panel2:#1f151f; --line:#4a3147;
+    --ink:#f4e6ee; --ink2:#cdacc0; --dim:#8a6d80; --amber:#e487ad; --honey:#f6b8d2;
+    --glow:rgba(228,135,173,.22); --glow2:rgba(246,184,210,.12);
+  }
+  :root[data-theme="light"]{
+    --bg:#fbeef3; --bg2:#fdf5f8; --panel:#ffffff; --panel2:#fcf0f5; --line:#f0d4e0;
+    --ink:#3a2230; --ink2:#7a5468; --dim:#bd9aac; --amber:#d96a9a; --honey:#e487ad;
+    --glow:rgba(217,106,154,.13); --glow2:rgba(228,135,173,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);color:var(--ink);font-family:'Spectral',Georgia,serif;font-weight:300;
+    line-height:1.7;-webkit-font-smoothing:antialiased;transition:background .6s,color .6s;
+    position:relative;overflow-x:hidden;min-height:100vh;
+  }
+  /* 樱花：花瓣般弥漫的柔粉光晕 */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;transition:opacity .6s;
+    background:
+      radial-gradient(55% 38% at 50% -4%, var(--glow), transparent 72%),
+      radial-gradient(40% 34% at 14% 86%, var(--glow2), transparent 72%),
+      radial-gradient(40% 34% at 90% 64%, var(--glow2), transparent 72%),
+      radial-gradient(130% 100% at 50% 132%, rgba(0,0,0,.34), transparent 56%);}
+  :root[data-theme="light"] body::before{
+    background:
+      radial-gradient(55% 40% at 50% -4%, var(--glow), transparent 74%),
+      radial-gradient(40% 34% at 12% 88%, var(--glow2), transparent 74%),
+      radial-gradient(40% 34% at 92% 62%, var(--glow2), transparent 74%);}
+  ::selection{background:var(--amber);color:var(--bg)}
+  nav,main{position:relative;z-index:2}
+
+  nav{display:flex;align-items:center;justify-content:space-between;padding:26px clamp(20px,5vw,64px)}
+  .logo{font-family:'Noto Serif SC',serif;font-weight:600;font-size:18px;display:flex;align-items:center;gap:11px}
+  .logo::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--amber);
+    box-shadow:0 0 16px 3px var(--glow);animation:flick 4.5s ease-in-out infinite}
+  @keyframes flick{0%,100%{opacity:.7}45%{opacity:1}55%{opacity:.85}}
+  .links{display:flex;gap:28px;align-items:center}
+  .links a{font-family:'Fraunces',serif;font-size:14px;color:var(--ink2);text-decoration:none;cursor:pointer;transition:color .35s;position:relative}
+  .links a:hover,.links a.on{color:var(--amber)}
+  .links a.on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:-8px;width:4px;height:4px;border-radius:50%;background:var(--amber)}
+  .toggle{font-family:'Fraunces',serif;font-size:12.5px;border:1px solid var(--line);background:var(--panel);
+    color:var(--ink2);padding:7px 15px;border-radius:40px;cursor:pointer;transition:all .35s}
+  .toggle:hover{border-color:var(--amber);color:var(--amber)}
+
+  main{max-width:1000px;margin:0 auto;padding:0 clamp(20px,5vw,64px)}
+  .rise{opacity:0;transform:translateY(24px);animation:rise 1.1s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  .hero{padding:90px 0 56px;text-align:center}
+  .kick{font-family:'Fraunces',serif;font-style:italic;color:var(--amber);font-size:15px;letter-spacing:.04em;margin-bottom:26px;opacity:0;animation:rise 1.1s .05s forwards}
+  .hero h1{font-family:'Noto Serif SC',serif;font-weight:500;font-size:clamp(30px,5vw,56px);line-height:1.35;
+    letter-spacing:.01em;max-width:18ch;margin:0 auto;text-wrap:balance}
+  .hero h1 em{font-family:'Fraunces',serif;font-style:italic;font-weight:300;color:var(--honey)}
+  .hero .cite{margin-top:30px;color:var(--ink2);font-style:italic;font-size:16px}
+  .hero .cite::before,.hero .cite::after{content:"·";color:var(--amber);margin:0 10px}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:20px 0}
+  @media(max-width:640px){.stats{grid-template-columns:1fr}}
+  .stat{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:16px;padding:28px 26px;position:relative;overflow:hidden}
+  .stat::after{content:"";position:absolute;top:-45%;right:-18%;width:130px;height:130px;border-radius:50%;
+    background:var(--glow);filter:blur(22px)}
+  .stat .n{font-family:'Fraunces',serif;font-weight:600;font-size:46px;line-height:1;letter-spacing:-.02em;position:relative}
+  .stat .n span{font-size:.4em;font-style:italic;color:var(--amber);margin-left:4px}
+  .stat .l{font-family:'Noto Serif SC',serif;color:var(--ink2);font-size:14px;margin-top:12px;position:relative}
+
+  .sec{margin:72px 0 26px;display:flex;align-items:center;gap:16px}
+  .sec h2{font-family:'Noto Serif SC',serif;font-weight:600;font-size:24px}
+  .sec .en{font-family:'Fraunces',serif;font-style:italic;color:var(--amber);font-size:15px}
+  .sec .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+  .souls{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center}
+  .sw{font-family:'Noto Serif SC',serif;color:var(--ink);text-decoration:none;line-height:1;
+    padding:9px 18px;border:1px solid var(--line);border-radius:40px;background:var(--panel);
+    opacity:0;animation:swin .8s cubic-bezier(.2,.8,.2,1) forwards;transition:all .4s;cursor:pointer}
+  .sw:hover{border-color:var(--amber);color:var(--honey);box-shadow:0 0 28px -6px var(--glow);transform:translateY(-3px)}
+  @keyframes swin{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+
+  .essays{display:flex;flex-direction:column;gap:12px}
+  .essay{display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;
+    background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:14px;padding:20px 24px;text-decoration:none;color:inherit;cursor:pointer;
+    transition:transform .4s cubic-bezier(.2,.8,.2,1),border-color .4s,box-shadow .4s}
+  .essay:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--amber) 50%,var(--line));
+    box-shadow:0 22px 44px -28px rgba(0,0,0,.7),0 0 36px -22px var(--glow)}
+  .essay .glyph{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:'Fraunces',serif;font-size:16px;color:var(--amber);border:1px solid var(--line);flex-shrink:0}
+  .essay .ti{font-family:'Noto Serif SC',serif;font-weight:500;font-size:19px;transition:color .35s}
+  .essay:hover .ti{color:var(--honey)}
+  .essay .pv{color:var(--ink2);font-size:14px;margin-top:5px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .essay .side{text-align:right;white-space:nowrap}
+  .essay .side .d{font-family:'Fraunces',serif;font-size:13px;color:var(--ink2)}
+  .essay .side .w{font-size:12px;color:var(--dim);margin-top:4px}
+
+  footer{margin:84px 0 64px;padding-top:26px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+    font-family:'Fraunces',serif;font-style:italic;color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+  <nav>
+    <div class="logo">文字时光机</div>
+    <div class="links">
+      <a class="on">总览</a><a>写作画像</a><a>仓库</a><a>写作</a>
+      <button class="toggle" onclick="tt()">☀ 粉樱晴日</button>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div class="kick">Under the Blossoms · 樱下一问</div>
+      <h1>我们写下的每一个字，<br>都是寄给<em>未来自己</em>的信。</h1>
+      <div class="cite">你最近一次，为什么而停笔？</div>
+    </section>
+
+    <section class="stats">
+      <div class="stat rise" style="animation-delay:.1s"><div class="n">128<span>篇</span></div><div class="l">累计随笔</div></div>
+      <div class="stat rise" style="animation-delay:.2s"><div class="n">96.4<span>k</span></div><div class="l">总字数</div></div>
+      <div class="stat rise" style="animation-delay:.3s"><div class="n">23<span>天</span></div><div class="l">连续写作</div></div>
+    </section>
+
+    <div class="sec"><h2>写作画像</h2><span class="en">Your Soul, in Words</span><span class="rule"></span></div>
+    <section class="souls" id="souls"></section>
+
+    <div class="sec"><h2>近期随笔</h2><span class="en">Recent Entries</span><span class="rule"></span></div>
+    <section class="essays">
+      <a class="essay rise" style="animation-delay:.1s"><div class="glyph">海</div><div><div class="ti">海边那家旧书店还开着</div><div class="pv">风把书页吹得哗哗响，像有人替我读那些没读完的句子。</div></div><div class="side"><div class="d">06 / 11</div><div class="w">1,240 字</div></div></a>
+      <a class="essay rise" style="animation-delay:.18s"><div class="glyph">默</div><div><div class="ti">关于沉默的几种用法</div><div class="pv">母亲不说话的时候最响。我学了很多年才听懂那种安静里的叮嘱。</div></div><div class="side"><div class="d">06 / 09</div><div class="w">860 字</div></div></a>
+      <a class="essay rise" style="animation-delay:.26s"><div class="glyph">昏</div><div><div class="ti">黄昏是一天里最诚实的时刻</div><div class="pv">光开始撤退，所有白天撑住的东西都在这一刻松了手。</div></div><div class="side"><div class="d">06 / 05</div><div class="w">1,510 字</div></div></a>
+      <a class="essay rise" style="animation-delay:.34s"><div class="glyph">远</div><div><div class="ti">远方其实是一种借口</div><div class="pv">我们说想去远方，多半只是不想待在此刻。</div></div><div class="side"><div class="d">06 / 01</div><div class="w">640 字</div></div></a>
+    </section>
+
+    <footer><span>文字时光机 · 樱花 / The Sakura（粉樱·绯紫）方向样例</span><span>Fraunces &amp; Noto Serif SC</span></footer>
+  </main>
+
+<script>
+  const words=[["孤独",26],["海",34],["黄昏",22],["母亲",30],["远方",20],["沉默",28],["光",24],["旧时",19],["潮汐",22]];
+  const c=document.getElementById('souls');
+  words.forEach((w,i)=>{const a=document.createElement('a');a.className='sw';a.href='#';
+    a.textContent=w[0];a.style.fontSize=w[1]+'px';a.style.animationDelay=(.15+i*.08)+'s';c.appendChild(a);});
+  function tt(){const r=document.documentElement;const d=r.dataset.theme==='dark';
+    r.dataset.theme=d?'light':'dark';
+    document.querySelector('.toggle').textContent=d?'☾ 夜樱绯紫':'☀ 粉樱晴日';}
+</script>
+</body>
+</html>

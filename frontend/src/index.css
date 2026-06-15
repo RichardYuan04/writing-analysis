@@ -1,45 +1,11 @@
 /* ─────────────────────────────────────────────
-   文字时光机 · 暖光双主题 (Warm Lamp)
-   默认深色「深夜书桌」，可切「白昼」暖米色
-   旧变量名全部保留，旧规则无需改动即可继承新色
+   文字时光机 · 主题系统
+   两维：data-family（desk/ocean/summer/sakura）× data-mode（dark/light）
+   每个组合一套 color token，变量名全复用，App.css 规则零改动继承
    ───────────────────────────────────────────── */
 
-:root,
-:root[data-theme="dark"] {
-  /* 背景层次 */
-  --bg: #17110b;
-  --bg2: #1e1610;
-  --panel: #241a11;
-  --panel2: #1b130c;
-  --bg-card: #241a11;
-
-  /* 文字 */
-  --text-primary: #f1e7d6;
-  --text-secondary: #c6b39a;
-  --text-hint: #8c7560;
-
-  /* 暖光强调色 */
-  --accent: #e89b50;        /* 橘色台灯 */
-  --accent-light: #f3c781;  /* 蜂蜜金 */
-  --honey: #f3c781;
-  --on-accent: #1a130c;     /* 暖色按钮上的文字（深色主题用近黑） */
-  --border: #3a2c1d;
-  --border-soft: #2e2317;
-
-  /* 光晕 */
-  --glow: rgba(232, 155, 80, 0.22);
-  --glow2: rgba(243, 199, 129, 0.10);
-
-  /* 情绪色 */
-  --sentiment-positive: #e89b50;
-  --sentiment-negative: #7c9cc0;
-  --sentiment-neutral: #9c8568;
-
-  /* 卡片渐变 + 阴影 */
-  --card-grad: linear-gradient(160deg, var(--panel), var(--panel2));
-  --shadow-card: 0 22px 44px -28px rgba(0, 0, 0, 0.85);
-  --shadow-glow: 0 0 36px -22px var(--glow);
-
+/* ── 共享 token（与配色无关）── */
+:root {
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -47,40 +13,93 @@
   --font-display: 'Fraunces', Georgia, serif;
   --font-serif: 'Noto Serif SC', Georgia, serif;
   --font-sans: 'Spectral', 'PingFang SC', -apple-system, system-ui, sans-serif;
-}
-
-:root[data-theme="light"] {
-  --bg: #f4ebdd;
-  --bg2: #fbf5ea;
-  --panel: #fffdf7;
-  --panel2: #fbf4e8;
-  --bg-card: #fffdf7;
-
-  --text-primary: #2a2015;
-  --text-secondary: #6c5945;
-  --text-hint: #a8927b;
-
-  --accent: #c87a2e;
-  --accent-light: #b07d28;
-  --honey: #b07d28;
-  --on-accent: #fffdf7;
-  --border: #e6d8c2;
-  --border-soft: #efe4d2;
-
-  --glow: rgba(200, 122, 46, 0.14);
-  --glow2: rgba(176, 125, 40, 0.07);
-
-  --sentiment-positive: #c87a2e;
-  --sentiment-negative: #5f7a96;
-  --sentiment-neutral: #b3a085;
 
   --card-grad: linear-gradient(160deg, var(--panel), var(--panel2));
-  --shadow-card: 0 18px 40px -28px rgba(90, 60, 25, 0.4);
-  --shadow-glow: 0 0 30px -20px var(--glow);
+  --shadow-glow: 0 0 36px -22px var(--glow);
+}
+
+/* ── 明暗共性：暗角 + 卡片阴影 ── */
+:root[data-mode="dark"]  { --vignette: rgba(0, 0, 0, 0.40); --shadow-card: 0 22px 44px -28px rgba(0, 0, 0, 0.85); }
+:root[data-mode="light"] { --vignette: transparent;          --shadow-card: 0 18px 40px -28px rgba(40, 34, 24, 0.34); }
+
+/* ── 书桌 · 夜 （默认 / 兜底）── */
+:root,
+:root[data-family="desk"][data-mode="dark"] {
+  --bg:#17110b; --bg2:#1e1610; --panel:#241a11; --panel2:#1b130c; --bg-card:#241a11;
+  --text-primary:#f1e7d6; --text-secondary:#c6b39a; --text-hint:#8c7560;
+  --accent:#e89b50; --accent-light:#f3c781; --honey:#f3c781; --on-accent:#1a130c;
+  --border:#3a2c1d; --border-soft:#2e2317;
+  --glow:rgba(232,155,80,.22); --glow2:rgba(243,199,129,.10);
+  --sentiment-positive:#e89b50; --sentiment-negative:#7c9cc0; --sentiment-neutral:#9c8568;
+}
+/* ── 书桌 · 昼 ── */
+:root[data-family="desk"][data-mode="light"] {
+  --bg:#f4ebdd; --bg2:#fbf5ea; --panel:#fffdf7; --panel2:#fbf4e8; --bg-card:#fffdf7;
+  --text-primary:#2a2015; --text-secondary:#6c5945; --text-hint:#a8927b;
+  --accent:#c87a2e; --accent-light:#b07d28; --honey:#b07d28; --on-accent:#fffdf7;
+  --border:#e6d8c2; --border-soft:#efe4d2;
+  --glow:rgba(200,122,46,.14); --glow2:rgba(176,125,40,.07);
+  --sentiment-positive:#c87a2e; --sentiment-negative:#5f7a96; --sentiment-neutral:#b3a085;
+}
+
+/* ── 海洋 · 夜 ── */
+:root[data-family="ocean"][data-mode="dark"] {
+  --bg:#0a1622; --bg2:#0e1d2e; --panel:#12283c; --panel2:#0d1f30; --bg-card:#12283c;
+  --text-primary:#e6f0f7; --text-secondary:#a6c2d4; --text-hint:#5f7e92;
+  --accent:#3fa9d4; --accent-light:#7fd6e8; --honey:#7fd6e8; --on-accent:#06131f;
+  --border:#21455f; --border-soft:#18344a;
+  --glow:rgba(63,169,212,.22); --glow2:rgba(127,214,232,.12);
+  --sentiment-positive:#3fa9d4; --sentiment-negative:#d08a8a; --sentiment-neutral:#5f7e92;
+}
+/* ── 海洋 · 昼 ── */
+:root[data-family="ocean"][data-mode="light"] {
+  --bg:#eaf4fa; --bg2:#f3f9fc; --panel:#ffffff; --panel2:#eef6fb; --bg-card:#ffffff;
+  --text-primary:#0e2a3d; --text-secondary:#3f6377; --text-hint:#8fadbe;
+  --accent:#1f87b8; --accent-light:#2a9fc8; --honey:#2a9fc8; --on-accent:#ffffff;
+  --border:#cfe3ef; --border-soft:#e1eef6;
+  --glow:rgba(31,135,184,.13); --glow2:rgba(42,159,200,.07);
+  --sentiment-positive:#1f87b8; --sentiment-negative:#b06a6a; --sentiment-neutral:#8fadbe;
+}
+
+/* ── 盛夏 · 夜 ── */
+:root[data-family="summer"][data-mode="dark"] {
+  --bg:#0c1710; --bg2:#102016; --panel:#15281b; --panel2:#0f1f14; --bg-card:#15281b;
+  --text-primary:#e6f1e3; --text-secondary:#aac4ab; --text-hint:#5f7e64;
+  --accent:#5fae5a; --accent-light:#9fd07a; --honey:#9fd07a; --on-accent:#08130b;
+  --border:#264a30; --border-soft:#1c3a24;
+  --glow:rgba(95,174,90,.22); --glow2:rgba(159,208,122,.12);
+  --sentiment-positive:#7fbf66; --sentiment-negative:#d08a8a; --sentiment-neutral:#8a9a78;
+}
+/* ── 盛夏 · 昼 ── */
+:root[data-family="summer"][data-mode="light"] {
+  --bg:#eef5e8; --bg2:#f5faf0; --panel:#ffffff; --panel2:#f0f6ea; --bg-card:#ffffff;
+  --text-primary:#16280f; --text-secondary:#456b3d; --text-hint:#8fa884;
+  --accent:#3f8a3a; --accent-light:#5aa84a; --honey:#5aa84a; --on-accent:#ffffff;
+  --border:#d3e4c6; --border-soft:#e4f0da;
+  --glow:rgba(63,138,58,.13); --glow2:rgba(90,168,74,.07);
+  --sentiment-positive:#3f8a3a; --sentiment-negative:#b06a6a; --sentiment-neutral:#8fa884;
+}
+
+/* ── 樱花 · 夜 ── */
+:root[data-family="sakura"][data-mode="dark"] {
+  --bg:#1a121a; --bg2:#221622; --panel:#2a1c2a; --panel2:#1f151f; --bg-card:#2a1c2a;
+  --text-primary:#f4e6ee; --text-secondary:#cdacc0; --text-hint:#8a6d80;
+  --accent:#e487ad; --accent-light:#f6b8d2; --honey:#f6b8d2; --on-accent:#1f0f18;
+  --border:#4a3147; --border-soft:#2e1f2c;
+  --glow:rgba(228,135,173,.22); --glow2:rgba(246,184,210,.12);
+  --sentiment-positive:#e487ad; --sentiment-negative:#8aa0bc; --sentiment-neutral:#8a6d80;
+}
+/* ── 樱花 · 昼 ── */
+:root[data-family="sakura"][data-mode="light"] {
+  --bg:#fbeef3; --bg2:#fdf5f8; --panel:#ffffff; --panel2:#fcf0f5; --bg-card:#ffffff;
+  --text-primary:#3a2230; --text-secondary:#7a5468; --text-hint:#bd9aac;
+  --accent:#d96a9a; --accent-light:#e487ad; --honey:#e487ad; --on-accent:#ffffff;
+  --border:#f0d4e0; --border-soft:#f8e4ee;
+  --glow:rgba(217,106,154,.13); --glow2:rgba(228,135,173,.07);
+  --sentiment-positive:#d96a9a; --sentiment-negative:#6a8ab0; --sentiment-neutral:#bd9aac;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { scroll-behavior: smooth; }
 
 body {
@@ -93,23 +112,35 @@ body {
   min-height: 100vh;
 }
 
-/* 一盏台灯：聚焦的橘色光晕从顶部洒下，四周渐暗 */
+/* ── 氛围光：每个色系各自的几何；暗角随 mode 自动开关（--vignette）── */
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  transition: opacity 0.6s;
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; transition: opacity 0.6s;
+}
+:root[data-family="desk"] body::before {
   background:
     radial-gradient(46% 38% at 50% -8%, var(--glow), transparent 72%),
     radial-gradient(34% 30% at 82% 16%, var(--glow2), transparent 70%),
-    radial-gradient(130% 100% at 50% 132%, rgba(0, 0, 0, 0.42), transparent 55%);
+    radial-gradient(130% 100% at 50% 132%, var(--vignette), transparent 55%);
 }
-:root[data-theme="light"] body::before {
+:root[data-family="ocean"] body::before {
   background:
-    radial-gradient(50% 40% at 50% -10%, var(--glow), transparent 72%),
-    radial-gradient(34% 30% at 84% 16%, var(--glow2), transparent 70%);
+    radial-gradient(85% 28% at 50% 4%, var(--glow), transparent 70%),
+    radial-gradient(120% 40% at 50% 72%, var(--glow2), transparent 72%),
+    radial-gradient(130% 100% at 50% 130%, var(--vignette), transparent 55%);
+}
+:root[data-family="summer"] body::before {
+  background:
+    radial-gradient(26% 22% at 22% 6%, var(--glow), transparent 70%),
+    radial-gradient(22% 20% at 70% 2%, var(--glow2), transparent 70%),
+    radial-gradient(30% 26% at 88% 40%, var(--glow2), transparent 72%),
+    radial-gradient(130% 100% at 50% 132%, var(--vignette), transparent 55%);
+}
+:root[data-family="sakura"] body::before {
+  background:
+    radial-gradient(55% 38% at 50% -4%, var(--glow), transparent 72%),
+    radial-gradient(40% 34% at 14% 86%, var(--glow2), transparent 72%),
+    radial-gradient(40% 34% at 90% 64%, var(--glow2), transparent 72%),
+    radial-gradient(130% 100% at 50% 132%, var(--vignette), transparent 56%);
 }
 
 ::selection { background: var(--accent); color: var(--bg); }
