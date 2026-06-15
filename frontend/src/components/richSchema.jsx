@@ -1,5 +1,8 @@
 // BlockNote 自定义 schema：在默认块基础上加 callout（提示框）和 citation（引用）
-import { BlockNoteSchema, defaultBlockSpecs, defaultProps } from '@blocknote/core'
+import {
+  BlockNoteSchema, defaultBlockSpecs, defaultProps,
+  defaultStyleSpecs, defaultInlineContentSpecs,
+} from '@blocknote/core'
 import { createReactBlockSpec } from '@blocknote/react'
 
 // 在光标处插入一个块：当前是空段落则原地变身，否则插在其后
@@ -19,9 +22,9 @@ const Callout = createReactBlockSpec(
   { type: 'callout', propSchema: { ...defaultProps }, content: 'inline' },
   {
     render: (props) => (
-      <div className="bn-callout">
-        <span className="bn-callout-ico" contentEditable={false}>💡</span>
-        <div className="bn-callout-body" ref={props.contentRef} />
+      <div className="rt-callout">
+        <span className="rt-callout-ico" contentEditable={false}>💡</span>
+        <div className="rt-callout-body" ref={props.contentRef} />
       </div>
     ),
   }
@@ -32,15 +35,19 @@ const Citation = createReactBlockSpec(
   { type: 'citation', propSchema: { ...defaultProps }, content: 'inline' },
   {
     render: (props) => (
-      <blockquote className="bn-citation">
-        <div className="bn-citation-body" ref={props.contentRef} />
+      <blockquote className="rt-citation">
+        <div className="rt-citation-body" ref={props.contentRef} />
       </blockquote>
     ),
   }
 )
 
+// 注意：BlockNote 0.51 的 createReactBlockSpec 返回的是「工厂函数」，必须调用一次才得到 spec
+// 显式带上默认 styleSpecs（含 textColor/backgroundColor）与 inlineContentSpecs，确保颜色等行内样式不丢
 export const schema = BlockNoteSchema.create({
-  blockSpecs: { ...defaultBlockSpecs, callout: Callout, citation: Citation },
+  blockSpecs: { ...defaultBlockSpecs, callout: Callout(), citation: Citation() },
+  styleSpecs: { ...defaultStyleSpecs },
+  inlineContentSpecs: { ...defaultInlineContentSpecs },
 })
 
 // ── 斜杠菜单自定义项 ──
