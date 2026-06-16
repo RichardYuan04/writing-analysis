@@ -1,7 +1,6 @@
 # 后端运行期依赖
-# 注：transformers/torch（情绪模型）为可选——main.py 已 try/except 优雅降级。
-# 从 Mac 带过来的 essays.db 已存有情绪分数，画像/SOUL 功能不需要现装 torch。
-# 若要让「新写文章」也能本地算情绪，再单独装：transformers torch
+# 情绪模型（transformers/torch）为必装：新文章本地算情绪分数依赖它。
+# main.py 仍保留 try/except 优雅降级，缺失时新文章情绪会退化为占位 0.5。
 fastapi
 uvicorn[standard]
 sqlalchemy
@@ -9,3 +8,5 @@ anthropic
 google-genai
 python-dotenv
 jieba
+transformers
+torch
