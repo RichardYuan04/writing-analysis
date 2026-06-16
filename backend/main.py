@@ -332,9 +332,14 @@ def create_essay(data: EssayCreate):
 
 
 @app.get("/essays")
-def list_essays():
+def list_essays(start_date: str = None, end_date: str = None):
     session = Session()
-    essays = session.query(Essay).order_by(Essay.date.desc()).all()
+    q = session.query(Essay)
+    if start_date:
+        q = q.filter(Essay.date >= start_date)
+    if end_date:
+        q = q.filter(Essay.date <= end_date)
+    essays = q.order_by(Essay.date.desc()).all()
     result = [
         {
             "id": e.id,
