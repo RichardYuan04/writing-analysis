@@ -6,6 +6,7 @@ import TodayReview from '../components/TodayReview'
 import WelcomeCard from '../components/WelcomeCard'
 import HintBar from '../components/HintBar'
 import SentimentTimeline from '../components/SentimentTimeline'
+import DateRangePicker from '../components/DateRangePicker'
 
 const PAGE_SIZE = 20
 
@@ -74,12 +75,10 @@ function Highlight({ text, query }) {
   return <>{parts}</>
 }
 
-export default function Overview({ onSelect, onWrite }) {
+export default function Overview({ onSelect, onWrite, startDate, endDate, onRange }) {
   const [stats, setStats] = useState(null)
   const [essays, setEssays] = useState([])
   const [loading, setLoading] = useState(true)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
 
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null) // null=未搜索
@@ -92,12 +91,13 @@ export default function Overview({ onSelect, onWrite }) {
 
   const fetchData = (start, end) => {
     setLoading(true)
-    Promise.all([getOverview(start, end), listEssays()])
+    Promise.all([getOverview(start, end), listEssays(start, end)])
       .then(([s, e]) => { setStats(s.data); setEssays(e.data); setLoading(false) })
       .catch(() => setLoading(false))
   }
 
-  useEffect(() => { fetchData('', '') }, [])
+  // 挂载时按当前（可能是从 App 带回的）筛选拉取
+  useEffect(() => { fetchData(startDate, endDate) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 防抖搜索：query 或日期范围变化时请求后端全文搜索
   useEffect(() => {
@@ -111,8 +111,12 @@ export default function Overview({ onSelect, onWrite }) {
     return () => clearTimeout(t)
   }, [query, startDate, endDate])
 
-  const handleFilter = () => { setPage(1); fetchData(startDate, endDate) }
-  const handleReset = () => { setStartDate(''); setEndDate(''); setQuery(''); setPage(1); fetchData('', '') }
+  // 日历浮窗点「应用」后：同步日期（提到 App 层）+ 重新拉取
+  const handleApplyRange = (start, end) => {
+    onRange?.(start, end)
+    setPage(1)
+    fetchData(start, end)
+  }
 
   const goToPage = (p) => {
     setPage(p)
@@ -128,7 +132,10 @@ export default function Overview({ onSelect, onWrite }) {
 
   if (loading) return <div className="loading">加载中…</div>
 
-  if (!essays || essays.length === 0) {
+  const isFiltered = !!(startDate || endDate)
+
+  // 仅当真正一篇都没有、且没有筛选/搜索时，才展示新手引导卡
+  if ((!essays || essays.length === 0) && !isFiltered && !query.trim()) {
     return <WelcomeCard onWrite={onWrite} />
   }
 
@@ -146,11 +153,10 @@ export default function Overview({ onSelect, onWrite }) {
 
       <div className="date-filter">
         <span className="filter-label">日期范围</span>
-        <input type="date" className="date-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
-        <span style={{ color: 'var(--text-hint)', fontSize: 13 }}>—</span>
-        <input type="date" className="date-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
-        <button className="filter-btn" onClick={handleFilter}>筛选</button>
-        {(startDate || endDate) && <button className="reset-btn" onClick={handleReset}>重置</button>}
+        <DateRangePicker startDate={startDate} endDate={endDate} onApply={handleApplyRange} />
+        {(startDate || endDate) && (
+          <button className="reset-btn" onClick={() => handleApplyRange('', '')}>重置</button>
+        )}
       </div>
 
       {!stats || stats.total_essays === 0 ? (

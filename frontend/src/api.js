@@ -8,7 +8,12 @@ const api = axios.create({
 
 export const createEssay = (data) => api.post('/essays', data)
 export const updateEssay = (id, data) => api.put(`/essays/${id}`, data)
-export const listEssays = () => api.get('/essays')
+export const listEssays = (startDate, endDate) => {
+  const params = {}
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
+  return api.get('/essays', { params })
+}
 export const getEssay = (id) => api.get(`/essays/${id}`)
 export const deleteEssay = (id) => api.delete(`/essays/${id}`)
 export const getRandomEssay = () => api.get('/essays/random')

@@ -12,6 +12,12 @@ export default function App() {
   const [page, setPage] = useState('overview')
   const [selectedId, setSelectedId] = useState(null)
   const [writePrefill, setWritePrefill] = useState(null)
+  // 总览页日期筛选：提到 App 层，离开/返回总览页时不丢失
+  const [ovStart, setOvStart] = useState('')
+  const [ovEnd, setOvEnd] = useState('')
+  // 进入设置页前所在的页面（用于设置页「返回」回退）
+  const [prevPage, setPrevPage] = useState('overview')
+  const [prevId, setPrevId] = useState(null)
   // 主题两维：色系 + 明暗（明暗兼容旧的 wtm-theme 键）
   const [family, setFamily] = useState(() => localStorage.getItem('wtm-family') || DEFAULT_FAMILY)
   const [mode, setMode] = useState(
@@ -37,6 +43,16 @@ export default function App() {
     navigate('write')
   }
 
+  // 打开设置页：先记住当前页面，便于之后回退
+  const openSettings = () => {
+    if (page !== 'settings') {
+      setPrevPage(page)
+      setPrevId(selectedId)
+    }
+    navigate('settings')
+  }
+  const backFromSettings = () => navigate(prevPage, prevId)
+
   return (
     <div className="app">
       <nav className="nav">
@@ -51,7 +67,7 @@ export default function App() {
           </button>
           <button
             className={`nav-gear ${page === 'settings' ? 'active' : ''}`}
-            onClick={() => navigate('settings')}
+            onClick={openSettings}
             title="设置"
             aria-label="设置"
           >⚙</button>
@@ -59,13 +75,21 @@ export default function App() {
       </nav>
 
       <main className={`main ${page === 'write' ? 'main--wide' : ''}`}>
-        {page === 'overview' && <Overview onSelect={(id) => navigate('detail', id)} onWrite={() => navigateToWrite()} />}
+        {page === 'overview' && (
+          <Overview
+            onSelect={(id) => navigate('detail', id)}
+            onWrite={() => navigateToWrite()}
+            startDate={ovStart}
+            endDate={ovEnd}
+            onRange={(s, e) => { setOvStart(s); setOvEnd(e) }}
+          />
+        )}
         {page === 'portrait' && <Portrait />}
         {page === 'vault' && <DraftVault onWrite={(prefill) => navigateToWrite(prefill)} />}
         {page === 'write' && <Write onSaved={() => navigate('overview')} prefill={writePrefill} onBack={writePrefill ? () => navigate('vault') : null} />}
         {page === 'detail' && <EssayDetail id={selectedId} onBack={() => navigate('overview')} />}
         {page === 'settings' && (
-          <Settings family={family} mode={mode} onFamily={setFamily} onMode={setMode} />
+          <Settings family={family} mode={mode} onFamily={setFamily} onMode={setMode} onBack={backFromSettings} />
         )}
       </main>
     </div>
