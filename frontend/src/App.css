@@ -939,9 +939,9 @@
 /* 写作页右列：写作工具 + 草稿箱 竖向堆叠；整列一起 sticky，避免面板间重叠 */
 .write-right {
   display: flex; flex-direction: column; gap: 14px;
-  flex-shrink: 0; position: sticky; top: 20px;
+  flex-shrink: 0; position: sticky; top: 72px;
   align-items: flex-end;
-  max-height: calc(100vh - 40px); overflow-y: auto;
+  max-height: calc(100vh - 92px); overflow-y: auto;
   /* 留出滚动条空间，避免内容被遮 */
   padding-left: 2px;
 }
