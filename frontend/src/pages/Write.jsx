@@ -3,6 +3,7 @@ import { createEssay, moodReply, deleteDraft } from '../api'
 import MoodCard from '../components/MoodCard'
 import AssistPanel from '../components/AssistPanel'
 import DraftPanel from '../components/DraftPanel'
+import ReaderPanel from '../components/ReaderPanel'
 import RichEditor from '../components/RichEditor'
 import { blocksToPlainText, plainTextToBlocks, parseRich } from '../components/richSchema'
 import QUOTES from '../data/quotes'
@@ -63,6 +64,7 @@ export default function Write({ onSaved, prefill, onBack }) {
   const [undoStack, setUndoStack] = useState([])
   const [draftId, setDraftId] = useState(null)
   const [draftPanelCollapsed, setDraftPanelCollapsed] = useState(false)
+  const [readerPanelCollapsed, setReaderPanelCollapsed] = useState(false)
 
   const plainText = useMemo(() => blocksToPlainText(docBlocks), [docBlocks])
 
@@ -252,6 +254,11 @@ export default function Write({ onSaved, prefill, onBack }) {
           onDraftRemoved={() => setDraftId(null)}
           collapsed={draftPanelCollapsed}
           onToggle={() => setDraftPanelCollapsed((c) => !c)}
+        />
+        <ReaderPanel
+          getDoc={() => ({ title, content: plainText })}
+          collapsed={readerPanelCollapsed}
+          onToggle={() => setReaderPanelCollapsed((c) => !c)}
         />
       </div>
 
