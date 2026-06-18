@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-family="desk" data-mode="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>图标母题方案 · 写作工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Noto+Serif+SC:wght@400;500;600&family=Spectral:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --radius-sm:6px; --radius-md:10px; --radius-lg:16px;
+  --font-display:'Fraunces',Georgia,serif;
+  --font-serif:'Noto Serif SC',Georgia,serif;
+  --font-sans:'Spectral','PingFang SC',-apple-system,system-ui,sans-serif;
+  --card-grad:linear-gradient(160deg,var(--panel),var(--panel2));
+  --shadow-glow:0 0 36px -22px var(--glow);
+}
+:root[data-mode="dark"] { --shadow-card:0 22px 44px -28px rgba(0,0,0,.85); }
+:root[data-mode="light"]{ --shadow-card:0 18px 40px -28px rgba(40,34,24,.34); }
+:root[data-family="desk"][data-mode="dark"]{--bg:#17110b;--bg2:#1e1610;--panel:#241a11;--panel2:#1b130c;--text-primary:#f1e7d6;--text-secondary:#c6b39a;--text-hint:#8c7560;--accent:#e89b50;--accent-light:#f3c781;--on-accent:#1a130c;--border:#3a2c1d;--border-soft:#2e2317;--glow:rgba(232,155,80,.22);}
+:root[data-family="desk"][data-mode="light"]{--bg:#f4ebdd;--bg2:#fbf5ea;--panel:#fffdf7;--panel2:#fbf4e8;--text-primary:#2a2015;--text-secondary:#6c5945;--text-hint:#a8927b;--accent:#c87a2e;--accent-light:#b07d28;--on-accent:#fffdf7;--border:#e6d8c2;--border-soft:#efe4d2;--glow:rgba(200,122,46,.14);}
+:root[data-family="ocean"][data-mode="dark"]{--bg:#0a1622;--bg2:#0e1d2e;--panel:#12283c;--panel2:#0d1f30;--text-primary:#e6f0f7;--text-secondary:#a6c2d4;--text-hint:#5f7e92;--accent:#3fa9d4;--accent-light:#7fd6e8;--on-accent:#06131f;--border:#21455f;--border-soft:#18344a;--glow:rgba(63,169,212,.22);}
+:root[data-family="ocean"][data-mode="light"]{--bg:#eaf4fa;--bg2:#f3f9fc;--panel:#ffffff;--panel2:#eef6fb;--text-primary:#0e2a3d;--text-secondary:#3f6377;--text-hint:#8fadbe;--accent:#1f87b8;--accent-light:#2a9fc8;--on-accent:#ffffff;--border:#cfe3ef;--border-soft:#e1eef6;--glow:rgba(31,135,184,.13);}
+:root[data-family="sakura"][data-mode="dark"]{--bg:#1a121a;--bg2:#241726;--panel:#2a1b2c;--panel2:#1f1420;--text-primary:#f6e9f0;--text-secondary:#d3b4c6;--text-hint:#9a7d8e;--accent:#e487ad;--accent-light:#f6b8d2;--on-accent:#1a0f15;--border:#4a2c3d;--border-soft:#3a2230;--glow:rgba(228,135,173,.22);}
+:root[data-family="summer"][data-mode="dark"]{--bg:#0c1710;--bg2:#102016;--panel:#15281b;--panel2:#0f1f14;--text-primary:#e6f1e3;--text-secondary:#aac4ab;--text-hint:#5f7e64;--accent:#5fae5a;--accent-light:#9fd07a;--on-accent:#08130b;--border:#264a30;--border-soft:#1c3a24;--glow:rgba(95,174,90,.22);}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);background:radial-gradient(120% 80% at 80% -10%,var(--bg2),var(--bg) 60%);color:var(--text-primary);min-height:100vh;padding:32px clamp(16px,4vw,48px) 64px;transition:background .5s,color .5s;}
+.shell{max-width:1180px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:6px;flex-wrap:wrap}
+.brand{font-family:var(--font-display);font-style:italic;font-size:15px;color:var(--accent)}
+.brand small{font-style:normal;font-family:var(--font-sans);color:var(--text-hint);margin-left:8px;font-size:12px;letter-spacing:.5px}
+.theme-ctl{margin-left:auto;display:flex;align-items:center;gap:8px}
+.swatches{display:flex;gap:6px}
+.sw{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;transition:transform .2s}
+.sw:hover{transform:scale(1.15)}
+.sw[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--glow)}
+.sw.desk{background:linear-gradient(135deg,#241a11,#e89b50)}
+.sw.ocean{background:linear-gradient(135deg,#12283c,#3fa9d4)}
+.sw.sakura{background:linear-gradient(135deg,#2a1b2c,#e487ad)}
+.sw.summer{background:linear-gradient(135deg,#15281b,#5fae5a)}
+.mode-btn{border:1px solid var(--border);background:var(--panel);color:var(--accent);font-size:12px;padding:5px 12px;border-radius:16px;cursor:pointer;font-family:var(--font-sans)}
+
+h1.page-h{font-family:var(--font-display);font-weight:600;font-size:clamp(24px,3vw,34px);margin:12px 0 4px}
+.page-sub{color:var(--text-secondary);font-size:14px;max-width:64ch;line-height:1.7}
+.page-sub em{font-style:italic;color:var(--accent)}
+.legend{margin:14px 0 26px;font-size:12.5px;color:var(--text-hint);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.legend b{color:var(--text-secondary);font-weight:500}
+
+.grid4{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+@media(max-width:820px){.grid4{grid-template-columns:1fr}}
+.style-card{background:var(--card-grad);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;position:relative;overflow:hidden}
+.style-card::after{content:"";position:absolute;top:-40%;right:-10%;width:160px;height:160px;border-radius:50%;background:var(--glow);filter:blur(32px);pointer-events:none}
+.sc-h{display:flex;align-items:baseline;gap:10px;position:relative}
+.sc-name{font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--text-primary)}
+.sc-en{font-family:var(--font-display);font-style:italic;font-size:12px;color:var(--accent)}
+.sc-desc{font-size:12.5px;color:var(--text-hint);line-height:1.6;margin:6px 0 16px;position:relative}
+
+.icon-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;position:relative}
+.icell{display:flex;flex-direction:column;align-items:center;gap:7px}
+.icell .lab{font-size:11px;color:var(--text-secondary)}
+
+/* ── 图标四种母题的统一样式（同一套 SVG 几何，四种处理）── */
+.ic{display:inline-grid;place-items:center;width:42px;height:42px;position:relative;flex-shrink:0}
+.ic svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;position:relative}
+
+/* 1 细线极简 */
+.ic-line{color:var(--text-secondary)}
+.ic-line svg{stroke-width:1.5}
+
+/* 2 篆刻印章 */
+.ic-seal{color:var(--accent);border:1.5px solid var(--accent-light);border-radius:7px;
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 16%,var(--panel)),var(--panel2));
+  box-shadow:inset 0 0 8px -4px var(--glow)}
+.ic-seal svg{stroke-width:1.7;width:22px;height:22px}
+
+/* 3 水墨笔触 */
+.ic-ink{color:var(--text-primary)}
+.ic-ink::before{content:"";position:absolute;width:32px;height:32px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--accent) 26%,transparent),transparent 68%);filter:blur(3px)}
+.ic-ink svg{stroke-width:2.5}
+
+/* 4 双色 duotone */
+.ic-duo{color:var(--accent)}
+.ic-duo::before{content:"";position:absolute;width:34px;height:34px;border-radius:11px;
+  background:color-mix(in srgb,var(--accent) 15%,transparent)}
+.ic-duo svg{stroke-width:1.7}
+
+/* 在写作工具按钮里的真实观感 */
+.ctx{margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft);position:relative}
+.ctx-t{font-size:11px;color:var(--text-hint);margin-bottom:10px;letter-spacing:.5px}
+.ctx-row{display:flex;gap:8px;flex-wrap:wrap}
+.ctx-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent-light);background:var(--panel);
+  color:var(--accent);font-size:13px;padding:5px 12px;border-radius:18px;font-family:var(--font-sans)}
+.ctx-btn .ic{width:20px;height:20px}
+.ctx-btn .ic svg{width:16px;height:16px}
+.ctx-btn .ic-seal{border-width:1px;border-radius:5px}
+.ctx-btn .ic-seal svg{width:13px;height:13px}
+
+.foot{margin-top:32px;color:var(--text-hint);font-size:12px;line-height:1.8;border-top:1px solid var(--border-soft);padding-top:16px}
+.foot b{color:var(--text-secondary);font-weight:500}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">写作工具 · 图标母题<small>ICON MOTIFS · 设计稿</small></div>
+    <div class="theme-ctl">
+      <div class="swatches" id="sw">
+        <button class="sw desk"   data-f="desk"   aria-current="true" title="书桌"></button>
+        <button class="sw ocean"  data-f="ocean"  title="海洋"></button>
+        <button class="sw sakura" data-f="sakura" title="樱花"></button>
+        <button class="sw summer" data-f="summer" title="盛夏"></button>
+      </div>
+      <button class="mode-btn" id="mode">☾ 夜</button>
+    </div>
+  </div>
+
+  <h1 class="page-h">四种母题，同一套图标</h1>
+  <p class="page-sub">把写作页那 8 个招牌图标（缩减 / 同义 / 比喻 / 扩展 / 找引文 / 写作工具 / 草稿箱 / 读者视角）各画一版。全部是手写 inline SVG、走 <em>currentColor</em>——<em>切换右上角色系与昼夜，看它们自动跟着变色</em>，这是 emoji 永远做不到的。</p>
+  <div class="legend"><b>提示：</b>换主题/昼夜，所有图标随 accent 同步换色 · 读者班底的 诗/叙/哲 字徽保留不动，新图标与它同源</div>
+
+  <div class="grid4" id="cards"></div>
+
+  <div class="foot">
+    <b>这是母题对比稿</b>，几何是同一套、四种处理方式（细线 / 套印章框 / 加水墨晕 / 加双色底）。定了方向后我会逐个精修线条与光学对齐，并替换写作页里对应的 emoji。<br>
+    <b>建议：</b>招牌处用选定母题手写，长尾的 ✕ / ▸ / ↩ 等用同风格补齐即可。
+  </div>
+</div>
+
+<script>
+// 同一套图标几何（24×24，inner SVG）。四种母题复用同一份 path。
+const ICONS = [
+  { key:'reduce', lab:'缩减', svg:'<line x1="12" y1="5" x2="12" y2="19"/><path d="M4.5 12 H9 M6.8 9.7 L9 12 L6.8 14.3"/><path d="M19.5 12 H15 M17.2 9.7 L15 12 L17.2 14.3"/>' },
+  { key:'synonym', lab:'同义', svg:'<path d="M5 9.3 H17 M14.2 6.6 L17 9.3 L14.2 12"/><path d="M19 14.7 H7 M9.8 12 L7 14.7 L9.8 17.4"/>' },
+  { key:'metaphor', lab:'比喻', svg:'<path d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"/>' },
+  { key:'expand', lab:'扩展', svg:'<line x1="12" y1="5" x2="12" y2="19"/><path d="M9 12 H4.5 M6.8 9.7 L4.5 12 L6.8 14.3"/><path d="M15 12 H19.5 M17.2 9.7 L19.5 12 L17.2 14.3"/>' },
+  { key:'cite', lab:'找引文', svg:'<path d="M5 15.5 V8 a2 2 0 0 1 2 -2 H17 a2 2 0 0 1 2 2 v4.5 a2 2 0 0 1 -2 2 H9 l-4 3 Z"/><path d="M9.4 10 q-1.3 0 -1.3 1.4 t1.3 1.4 M14 10 q-1.3 0 -1.3 1.4 t1.3 1.4"/>' },
+  { key:'pen', lab:'写作工具', svg:'<path d="M12 3 L16.5 13.5 L12 19.5 L7.5 13.5 Z"/><line x1="12" y1="8.5" x2="12" y2="15"/><circle cx="12" cy="12" r="1.2"/>' },
+  { key:'drafts', lab:'草稿箱', svg:'<path d="M5 13 V17.5 a1.5 1.5 0 0 0 1.5 1.5 H17.5 a1.5 1.5 0 0 0 1.5 -1.5 V13"/><path d="M5 13 H9 a3 3 0 0 0 6 0 H19"/><path d="M12 4 V9.5 M9.5 7 L12 9.5 L14.5 7"/>' },
+  { key:'reader', lab:'读者视角', svg:'<path d="M12 6.5 C10 5 6.5 5 4.5 5.8 V17.5 C6.5 16.7 10 16.7 12 18 C14 16.7 17.5 16.7 19.5 17.5 V5.8 C17.5 5 14 5 12 6.5 Z"/><line x1="12" y1="6.5" x2="12" y2="18"/>' },
+];
+
+const STYLES = [
+  { cls:'ic-line', name:'细线极简', en:'hairline', desc:'均匀细描边、圆头收尾。克制、安静，让位给文字本身——最不抢戏。' },
+  { cls:'ic-seal', name:'篆刻印章', en:'seal', desc:'每个图标嵌进一方圆角印面，与读者班底 诗/叙/哲 字徽同源。最独家、最贴这个 app 的篆刻气。' },
+  { cls:'ic-ink',  name:'水墨笔触', en:'ink', desc:'更重的笔画 + 背后一缕暖色墨晕，文人气最足。小尺寸下需要更用心地控形。' },
+  { cls:'ic-duo',  name:'双色 duotone', en:'duotone', desc:'线条 + 一抹半透明 accent 底色，现代、稍有「炫」感，层次更厚。' },
+];
+
+const CTX = ['reduce','metaphor','expand'];  // 放进按钮里看真实观感
+
+function iconHtml(styleCls, svg){
+  return `<span class="ic ${styleCls}"><svg viewBox="0 0 24 24">${svg}</svg></span>`;
+}
+
+const cards = document.getElementById('cards');
+STYLES.forEach(s=>{
+  const cells = ICONS.map(ic=>`
+    <div class="icell">${iconHtml(s.cls, ic.svg)}<span class="lab">${ic.lab}</span></div>`).join('');
+  const ctxBtns = CTX.map(k=>{
+    const ic = ICONS.find(x=>x.key===k);
+    return `<span class="ctx-btn">${iconHtml(s.cls, ic.svg)}${ic.lab}</span>`;
+  }).join('');
+  const card = document.createElement('div');
+  card.className='style-card';
+  card.innerHTML = `
+    <div class="sc-h"><span class="sc-name">${s.name}</span><span class="sc-en">${s.en}</span></div>
+    <div class="sc-desc">${s.desc}</div>
+    <div class="icon-grid">${cells}</div>
+    <div class="ctx">
+      <div class="ctx-t">放进写作工具按钮里：</div>
+      <div class="ctx-row">${ctxBtns}</div>
+    </div>`;
+  cards.appendChild(card);
+});
+
+document.getElementById('sw').addEventListener('click',e=>{
+  const b=e.target.closest('.sw'); if(!b)return;
+  document.documentElement.dataset.family=b.dataset.f;
+  [...document.querySelectorAll('.sw')].forEach(s=>s.setAttribute('aria-current',s===b));
+});
+document.getElementById('mode').addEventListener('click',e=>{
+  const r=document.documentElement; const dark=r.dataset.mode==='dark';
+  r.dataset.mode=dark?'light':'dark'; e.target.textContent=dark?'☀ 昼':'☾ 夜';
+});
+</script>
+</body>
+</html>
