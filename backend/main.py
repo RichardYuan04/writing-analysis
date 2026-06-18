@@ -717,6 +717,85 @@ def assist_expand(data: AssistRequest):
     return _assist_call(data, user, max_tokens=_cap(data.text, 3, 512, 2048), parse_options=False, model="claude-sonnet-4-6")
 
 
+# ── 读者视角 ──
+# 选一个人格读者，读完整篇 → 回一封第一人称的信。读整篇、不依赖选区、不注入 SOUL。
+READER_PERSONAS = {
+    "poet": {
+        "name": "诗人",
+        "system": (
+            "你是一位诗人。读一篇文章时，你只在意意象、节奏和语言的质地——"
+            "哪一句的画面让你停住，哪里的词太顺、像借来的，哪里的节奏泄了气。"
+        ),
+    },
+    "novelist": {
+        "name": "小说家",
+        "system": (
+            "你是一位小说家。读一篇文章时，你只在意人物、场景与细节——"
+            "作者是把它「演」出来了，还是在「讲」；现场是否立住，有没有一张脸、一个动作。"
+        ),
+    },
+    "philosopher": {
+        "name": "哲学家",
+        "system": (
+            "你是一位哲学家。读一篇文章时，你追问它底下「真正在问什么」，"
+            "把一个具体的场景上升为一个普遍的问题，温和地往深里带；你深化，不抬杠。"
+        ),
+    },
+    "editor": {
+        "name": "编辑",
+        "system": (
+            "你是一位编辑。读一篇文章时，你只看整体的骨架与气——"
+            "开头抓不抓人、中段塌不塌、结尾兑不兑现承诺、有没有一以贯之的线。用人话说，不抖术语。"
+        ),
+    },
+    "debater": {
+        "name": "辩论家",
+        "system": (
+            "你是一位辩论家。读一篇文章时，你专挑它的立论与逻辑漏洞——"
+            "那个不成立的「所以」、偷换的前提、回避的反例；你认真反驳，要求论断站得住。"
+        ),
+    },
+}
+
+_READER_TASK = (
+    "现在请你读完下面这篇文章，然后像一个真实的人，给作者本人写一封第一人称的信："
+    "有体温，不打分，不逐句批改；抓住真正打动你、或硌着你的地方来说，可以点名某个具体句子；"
+    "结尾不必强行总结。约 400–800 字。只输出信的正文，不要加标题或前缀。"
+)
+
+
+class AssistReaderRequest(BaseModel):
+    title: str = ""
+    content: str
+    persona: str
+
+
+@app.post("/assist/reader")
+def assist_reader(data: AssistReaderRequest):
+    content = (data.content or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="文章内容不能为空")
+    p = READER_PERSONAS.get(data.persona)
+    if not p:
+        raise HTTPException(status_code=400, detail="未知的读者")
+    sys_prompt = f"{p['system']}\n{_READER_TASK}"
+    user = f"标题：{(data.title or '无题').strip()}\n\n正文：\n{content}"
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-opus-4-8",
+            max_tokens=1400,
+            system=sys_prompt,
+            messages=[{"role": "user", "content": user}],
+        )
+        letter = "".join(getattr(b, "text", "") for b in message.content).strip()
+        return {"letter": letter}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[reader] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+
 # ── 风格 SOUL 文档 ──
 class StyleProfileGenerateRequest(BaseModel):
     essay_ids: list[int]
