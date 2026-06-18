@@ -796,6 +796,70 @@ def assist_reader(data: AssistReaderRequest):
         raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
 
 
+# ── 找引文 ──
+# 为选中论断联网检索 2–3 条带出处的证据。用 web_search 服务端工具，不注入 SOUL。
+CITE_SYSTEM = (
+    "你是一名严谨的资料员。为用户给出的论断，用联网检索找 2–3 条真实、可查证的证据"
+    "（名人名句、科学依据或历史事实皆可）。每条必须有真实可查的出处；"
+    "宁缺毋滥，绝不编造名言、数据或年份；查不到确切出处就不要给。\n"
+    "只输出证据，每条单独一行，严格用以下格式（用 ||| 分隔三段，不要加编号或解释）：\n"
+    "证据原文 ||| 出处（作者/著作/机构）||| 来源链接\n"
+    "如果没有任何可确证的证据，只输出一行：无"
+)
+
+_WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search"}
+
+
+class AssistCiteRequest(BaseModel):
+    text: str
+    context: str = ""
+
+
+def _parse_cite_lines(raw: str) -> list:
+    """解析「原文 ||| 出处 ||| URL」每行一条 → [{quote, source, url}]，最多 3 条。"""
+    out = []
+    for line in (raw or "").splitlines():
+        s = line.strip()
+        if not s or "|||" not in s:
+            continue
+        parts = [p.strip() for p in s.split("|||")]
+        quote = parts[0]
+        source = parts[1] if len(parts) > 1 else ""
+        url = parts[2] if len(parts) > 2 else ""
+        if quote:
+            out.append({"quote": quote, "source": source, "url": url})
+    return out[:3]
+
+
+@app.post("/assist/cite")
+def assist_cite(data: AssistCiteRequest):
+    text = (data.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="选中文字不能为空")
+    user = f"论断：{text}" + _ctx_line(data.context)
+    messages = [{"role": "user", "content": user}]
+    try:
+        # web_search 是服务端工具，API 自跑检索循环；pause_turn 时回填续跑（上限 3 轮）
+        for _ in range(3):
+            message = anthropic_client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                system=CITE_SYSTEM,
+                tools=[_WEB_SEARCH_TOOL],
+                messages=messages,
+            )
+            if getattr(message, "stop_reason", None) != "pause_turn":
+                break
+            messages.append({"role": "assistant", "content": message.content})
+        raw = "".join(getattr(b, "text", "") for b in message.content).strip()
+        return {"options": _parse_cite_lines(raw)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[cite] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+
 # ── 风格 SOUL 文档 ──
 class StyleProfileGenerateRequest(BaseModel):
     essay_ids: list[int]

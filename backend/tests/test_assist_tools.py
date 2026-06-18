@@ -36,3 +36,41 @@ def test_reader_rejects_empty_content(client, mock_anthropic):
         "title": "T", "content": "  ", "persona": "poet",
     })
     assert r.status_code == 400
+
+
+def test_cite_parses_quote_source_url(client, mock_anthropic):
+    mock_anthropic.set_text(
+        "知人者智，自知者明。 ||| 老子《道德经》 ||| https://example.com/a\n"
+        "我思故我在。 ||| 笛卡尔 ||| https://example.com/b"
+    )
+    r = client.post("/assist/cite", json={"text": "认识自己很重要", "context": ""})
+    assert r.status_code == 200
+    opts = r.json()["options"]
+    assert len(opts) == 2
+    assert opts[0] == {
+        "quote": "知人者智，自知者明。",
+        "source": "老子《道德经》",
+        "url": "https://example.com/a",
+    }
+
+
+def test_cite_uses_sonnet_and_web_search_no_soul(client, mock_anthropic):
+    mock_anthropic.set_text("x ||| y ||| z")
+    client.post("/assist/cite", json={"text": "论断", "context": ""})
+    cap = mock_anthropic.captured
+    assert cap["model"] == "claude-sonnet-4-6"
+    tool_types = [t.get("type") for t in cap["tools"]]
+    assert "web_search_20260209" in tool_types
+    assert "写作风格为" not in (cap.get("system") or "")
+
+
+def test_cite_empty_results_returns_empty_options(client, mock_anthropic):
+    mock_anthropic.set_text("没有查到可靠的出处。")
+    r = client.post("/assist/cite", json={"text": "论断", "context": ""})
+    assert r.status_code == 200
+    assert r.json()["options"] == []
+
+
+def test_cite_rejects_empty_text(client, mock_anthropic):
+    r = client.post("/assist/cite", json={"text": "  ", "context": ""})
+    assert r.status_code == 400
