@@ -940,6 +940,10 @@
 .write-right {
   display: flex; flex-direction: column; gap: 14px;
   flex-shrink: 0; position: sticky; top: 20px;
+  align-items: flex-end;
+  max-height: calc(100vh - 40px); overflow-y: auto;
+  /* 留出滚动条空间，避免内容被遮 */
+  padding-left: 2px;
 }
 
 /* 草稿箱面板 */
@@ -948,7 +952,8 @@
   background: var(--card-grad); border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: 14px;
 }
-.draft-panel.collapsed { padding: 8px; text-align: center; }
+.draft-panel.collapsed { width: 44px; padding: 10px 0; display: flex; justify-content: center; }
+.draft-panel.collapsed .dp-expand { font-size: 18px; }
 .dp-expand, .dp-collapse {
   border: none; background: none; cursor: pointer; color: var(--accent); font-size: 15px;
 }
