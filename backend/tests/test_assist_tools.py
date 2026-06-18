@@ -1,8 +1,30 @@
 import main
+import pytest
 
 
-def test_reader_returns_letter(client, mock_anthropic):
-    mock_anthropic.set_text("读你这篇时，我先听见了灯。……")
+@pytest.fixture
+def mock_deepseek(monkeypatch):
+    """把 main._deepseek_chat 换成可编程假对象。
+    set_text 设返回的信文；captured 记录最近一次的 (system, user, max_tokens)。"""
+    state = {"text": "letter-ok", "captured": {}}
+
+    def fake(system, user, max_tokens):
+        state["captured"] = {"system": system, "user": user, "max_tokens": max_tokens}
+        return state["text"]
+
+    monkeypatch.setattr(main, "_deepseek_chat", fake)
+
+    class Ctl:
+        @property
+        def captured(self):
+            return state["captured"]
+        def set_text(self, t):
+            state["text"] = t
+    return Ctl()
+
+
+def test_reader_returns_letter(client, mock_deepseek):
+    mock_deepseek.set_text("读你这篇时，我先听见了灯。……")
     r = client.post("/assist/reader", json={
         "title": "夜里十一点的便利店",
         "content": "我买了一瓶水，其实并不渴。",
@@ -12,26 +34,26 @@ def test_reader_returns_letter(client, mock_anthropic):
     assert r.json()["letter"].startswith("读你这篇时")
 
 
-def test_reader_uses_opus_and_persona_system(client, mock_anthropic):
-    mock_anthropic.set_text("ok")
+def test_reader_calls_deepseek_with_persona_system(client, mock_deepseek):
     client.post("/assist/reader", json={
         "title": "T", "content": "C", "persona": "debater",
     })
-    cap = mock_anthropic.captured
-    assert cap["model"] == "claude-opus-4-8"
+    cap = mock_deepseek.captured
     # 辩论家的人格设定进了 system，且没有注入 SOUL 风格指令
     assert "辩论家" in cap["system"]
     assert "写作风格为" not in cap["system"]
+    # 推理模型要给足 max_tokens（容纳推理 + 信文）
+    assert cap["max_tokens"] >= 4000
 
 
-def test_reader_rejects_bad_persona(client, mock_anthropic):
+def test_reader_rejects_bad_persona(client):
     r = client.post("/assist/reader", json={
         "title": "T", "content": "C", "persona": "nobody",
     })
     assert r.status_code == 400
 
 
-def test_reader_rejects_empty_content(client, mock_anthropic):
+def test_reader_rejects_empty_content(client):
     r = client.post("/assist/reader", json={
         "title": "T", "content": "  ", "persona": "poet",
     })

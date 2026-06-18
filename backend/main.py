@@ -14,6 +14,7 @@ import statistics
 import json
 from dotenv import load_dotenv
 import anthropic
+import httpx
 from google import genai as google_genai
 from google.genai import types as genai_types
 
@@ -40,6 +41,37 @@ anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 gemini_client = google_genai.Client(api_key=gemini_api_key) if gemini_api_key else None
+
+# DeepSeek（OpenAI 兼容接口），目前仅用于「读者视角」。配置全走 .env。
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+
+
+def _deepseek_chat(system: str, user: str, max_tokens: int) -> str:
+    """调 DeepSeek chat/completions（OpenAI 兼容），返回正式回复文本。
+    deepseek-v4-pro 是推理模型：reasoning_content 丢弃，只取 content；
+    故 max_tokens 要给足（推理 token + 正文）。"""
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("DEEPSEEK_API_KEY 未配置")
+    resp = httpx.post(
+        f"{DEEPSEEK_BASE_URL}/chat/completions",
+        headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                 "Content-Type": "application/json"},
+        json={
+            "model": DEEPSEEK_MODEL,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "max_tokens": max_tokens,
+            "stream": False,
+        },
+        timeout=120,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return (data["choices"][0]["message"].get("content") or "").strip()
 
 app = FastAPI()
 
@@ -781,13 +813,8 @@ def assist_reader(data: AssistReaderRequest):
     sys_prompt = f"{p['system']}\n{_READER_TASK}"
     user = f"标题：{(data.title or '无题').strip()}\n\n正文：\n{content}"
     try:
-        message = anthropic_client.messages.create(
-            model="claude-opus-4-8",
-            max_tokens=1400,
-            system=sys_prompt,
-            messages=[{"role": "user", "content": user}],
-        )
-        letter = "".join(getattr(b, "text", "") for b in message.content).strip()
+        # 读者视角走 DeepSeek（推理模型，max_tokens 给足以容纳推理 + 信文）
+        letter = _deepseek_chat(sys_prompt, user, max_tokens=5000)
         return {"letter": letter}
     except HTTPException:
         raise
