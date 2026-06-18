@@ -1200,3 +1200,19 @@
 }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .lm-acts { display: flex; gap: 10px; margin-top: 20px; }
+
+/* ── 自有图标：篆刻印章母题（与 诗/叙/哲 字徽同源，走 currentColor）── */
+.seal-ic {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  width: 30px; height: 30px; color: var(--accent);
+  border: 1.5px solid var(--accent-light); border-radius: 7px;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 16%, var(--panel)), var(--panel2));
+  box-shadow: inset 0 0 8px -4px var(--glow);
+}
+.seal-ic svg { width: 18px; height: 18px; }
+.seal-ic--sm { width: 22px; height: 22px; border-width: 1px; border-radius: 5px; }
+.seal-ic--sm svg { width: 14px; height: 14px; }
+.seal-ic--plain { border: none; background: none; box-shadow: none; }
+
+.ap-title, .dp-title, .rp-title { display: inline-flex; align-items: center; gap: 7px; }
+.ap-action { display: inline-flex; align-items: center; gap: 6px; }

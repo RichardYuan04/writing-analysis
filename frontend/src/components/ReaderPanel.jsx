@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { assistReader } from '../api'
+import Icon from './Icon'
 
 // 5 个固定人格读者。字徽 + 名 + 一行「在意什么」。
 const READERS = [
@@ -41,7 +42,7 @@ export default function ReaderPanel({ getDoc, collapsed, onToggle }) {
   if (collapsed) {
     return (
       <aside className="reader-panel collapsed">
-        <button className="rp-expand" onClick={onToggle} title="展开读者视角">📖</button>
+        <button className="rp-expand" onClick={onToggle} title="展开读者视角"><Icon name="reader" className="seal-ic--plain" /></button>
       </aside>
     )
   }
@@ -50,7 +51,7 @@ export default function ReaderPanel({ getDoc, collapsed, onToggle }) {
     <>
       <aside className="reader-panel">
         <div className="rp-head">
-          <span className="rp-title">📖 读者视角</span>
+          <span className="rp-title"><Icon name="reader" className="seal-ic--sm" /> 读者视角</span>
           <button className="rp-collapse" onClick={onToggle} title="收起">▸</button>
         </div>
         <div className="rp-tip">今天，请谁读完你这篇？换一个人，在意的东西就变。</div>
