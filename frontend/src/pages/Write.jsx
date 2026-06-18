@@ -3,6 +3,7 @@ import { createEssay, moodReply, deleteDraft } from '../api'
 import MoodCard from '../components/MoodCard'
 import AssistPanel from '../components/AssistPanel'
 import DraftPanel from '../components/DraftPanel'
+import ReaderPanel from '../components/ReaderPanel'
 import RichEditor from '../components/RichEditor'
 import { blocksToPlainText, plainTextToBlocks, parseRich } from '../components/richSchema'
 import QUOTES from '../data/quotes'
@@ -58,11 +59,14 @@ export default function Write({ onSaved, prefill, onBack }) {
   const [confirmClear, setConfirmClear] = useState(false)
   const [greeting] = useState(daily)
   const [quote, setQuote] = useState(() => pickQuote(null))
+  const [qPhase, setQPhase] = useState('in')   // 金句切换动效：in（聚焦）/ out（淡出）
+  const [spinKey, setSpinKey] = useState(0)     // 让「换一句」图标每次点击都完整转一圈
   const [sel, setSel] = useState(null)
   const [panelCollapsed, setPanelCollapsed] = useState(false)
   const [undoStack, setUndoStack] = useState([])
   const [draftId, setDraftId] = useState(null)
   const [draftPanelCollapsed, setDraftPanelCollapsed] = useState(false)
+  const [readerPanelCollapsed, setReaderPanelCollapsed] = useState(false)
 
   const plainText = useMemo(() => blocksToPlainText(docBlocks), [docBlocks])
 
@@ -85,7 +89,15 @@ export default function Write({ onSaved, prefill, onBack }) {
     return () => clearTimeout(t)
   }, [title, docBlocks, date, mood, plainText])
 
-  const nextQuote = () => setQuote((q) => pickQuote(q))
+  // 换一句：旧句模糊上浮淡出 → 中途换字 → 新句去模糊下沉聚焦
+  const nextQuote = () => {
+    setSpinKey((k) => k + 1)
+    setQPhase('out')
+    setTimeout(() => {
+      setQuote((q) => pickQuote(q))
+      setQPhase('in')
+    }, 300)
+  }
 
   // AI 划词改写：用编辑器选区范围替换；替换前压入快照栈
   const applyAssist = (range, newText) => {
@@ -188,10 +200,12 @@ export default function Write({ onSaved, prefill, onBack }) {
           <div className="daily-q">
             <button className="daily-x" onClick={() => setDailyShown(false)}>✕</button>
             <div className="daily-hello">{greeting.emoji} {greeting.hello}</div>
-            <blockquote className="daily-quote">{quote.t}</blockquote>
+            <blockquote className={`daily-quote q-${qPhase}`}>{quote.t}</blockquote>
             <div className="daily-row">
-              <span className="daily-cite">— {quote.a}{quote.s ? `《${quote.s}》` : ''}</span>
-              <button className="daily-next" onClick={nextQuote}>换一句</button>
+              <span className={`daily-cite q-${qPhase}`}>— {quote.a}{quote.s ? `《${quote.s}》` : ''}</span>
+              <button className="daily-next" onClick={nextQuote}>
+                <span key={spinKey} className="dn-ico">↻</span> 换一句
+              </button>
             </div>
           </div>
         )}
@@ -252,6 +266,11 @@ export default function Write({ onSaved, prefill, onBack }) {
           onDraftRemoved={() => setDraftId(null)}
           collapsed={draftPanelCollapsed}
           onToggle={() => setDraftPanelCollapsed((c) => !c)}
+        />
+        <ReaderPanel
+          getDoc={() => ({ title, content: plainText })}
+          collapsed={readerPanelCollapsed}
+          onToggle={() => setReaderPanelCollapsed((c) => !c)}
         />
       </div>
 

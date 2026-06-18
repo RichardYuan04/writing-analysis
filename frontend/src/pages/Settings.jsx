@@ -3,7 +3,7 @@ import { FAMILIES, themeName } from '../themes'
 export default function Settings({ family, mode, onFamily, onMode, onBack }) {
   return (
     <div className="settings-page">
-      {onBack && <button className="back-btn" onClick={onBack}>← 返回</button>}
+      {onBack && <button className="settings-back" onClick={onBack}>← 返回</button>}
       <h1 className="portrait-title">设置</h1>
       <p className="portrait-sub">Settings · 偏好与外观</p>
 

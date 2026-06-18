@@ -22,6 +22,8 @@ export const assistReduce = (data) => api.post('/assist/reduce', data)
 export const assistSynonyms = (data) => api.post('/assist/synonyms', data)
 export const assistMetaphor = (data) => api.post('/assist/metaphor', data)
 export const assistExpand = (data) => api.post('/assist/expand', data)
+export const assistReader = (data) => api.post('/assist/reader', data)
+export const assistCite = (data) => api.post('/assist/cite', data)
 export const getPortrait = () => api.get('/stats/portrait')
 export const deepAnalysis = () => api.post('/stats/deep-analysis')
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { listDrafts, createDraft, updateDraft, deleteDraft } from '../api'
+import Icon from './Icon'
 
 /**
  * 草稿箱面板（写作页右侧，AssistPanel 下方，可折叠）。
@@ -46,7 +47,7 @@ export default function DraftPanel({ current, draftId, onSaved, onOpen, onDraftR
   if (collapsed) {
     return (
       <aside className="draft-panel collapsed">
-        <button className="dp-expand" onClick={onToggle} title="展开草稿箱">📥</button>
+        <button className="dp-expand" onClick={onToggle} title="展开草稿箱"><Icon name="drafts" className="seal-ic--plain" /></button>
       </aside>
     )
   }
@@ -54,7 +55,7 @@ export default function DraftPanel({ current, draftId, onSaved, onOpen, onDraftR
   return (
     <aside className="draft-panel">
       <div className="dp-head">
-        <span className="dp-title">📥 草稿箱</span>
+        <span className="dp-title"><Icon name="drafts" className="seal-ic--sm" /> 草稿箱</span>
         <button className="dp-collapse" onClick={onToggle} title="收起草稿箱">▸</button>
       </div>
       <div className="dp-body">

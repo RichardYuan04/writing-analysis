@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { assistReduce, assistSynonyms, assistMetaphor, assistExpand } from '../api'
+import { assistReduce, assistSynonyms, assistMetaphor, assistExpand, assistCite } from '../api'
+import Icon from './Icon'
 
 /**
  * 写作工具面板（常驻右侧、可折叠）。
@@ -15,11 +16,13 @@ import { assistReduce, assistSynonyms, assistMetaphor, assistExpand } from '../a
  * 状态机优先级：loading > error > done(result/options) > applied > sel > idle
  */
 const ACTIONS = [
-  { key: 'reduce',   label: '✂️ 缩减',   kind: 'single',  call: assistReduce,   running: '正在缩减…',   cap: '缩减结果' },
-  { key: 'synonym',  label: '↔ 同义替换', kind: 'options', call: assistSynonyms, running: '正在找同义…', cap: '同义替换（点选采用）' },
-  { key: 'metaphor', label: '✦ 比喻',     kind: 'options', call: assistMetaphor, running: '正在打比方…', cap: '比喻建议（点选复制，自行粘回去改）', copy: true,
+  { key: 'reduce',   label: '缩减',   kind: 'single',  call: assistReduce,   running: '正在缩减…',   cap: '缩减结果' },
+  { key: 'synonym',  label: '同义替换', kind: 'options', call: assistSynonyms, running: '正在找同义…', cap: '同义替换（点选采用）' },
+  { key: 'metaphor', label: '比喻',     kind: 'options', call: assistMetaphor, running: '正在打比方…', cap: '比喻建议（点选复制，自行粘回去改）', copy: true,
     help: '比喻会完全放开：模型自由探索喻体、说法和遣词，不受你的风格档案约束。\n它会先抓住选中文字的核心关系再打比方；如果你选中的内容本身已是一个比喻，它会顺势给出几个平行的新比喻作为替换备选。\n小技巧：想针对某一个具体比喻做扩展，直接圈选那一小句，结果最精准。' },
-  { key: 'expand',   label: '✚ 扩展',     kind: 'single',  call: assistExpand,   running: '正在扩展…',   cap: '扩展结果' },
+  { key: 'expand',   label: '扩展',     kind: 'single',  call: assistExpand,   running: '正在扩展…',   cap: '扩展结果' },
+  { key: 'cite',     label: '找引文',  kind: 'options', call: assistCite,     running: '正在查证据…', cap: '引文建议（点选复制原文与出处）', copy: true,
+    help: '为你选中的论断联网检索 2–3 条带出处的证据（名人名句 / 科学依据 / 历史事实）。\n只给查得到出处的，点一条即复制「原文 + 出处」，自行粘回去织入。\n联网检索会慢几秒，请稍候。' },
 ]
 
 export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo, canUndo }) {
@@ -68,7 +71,7 @@ export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo,
   if (collapsed) {
     return (
       <aside className="assist-panel collapsed">
-        <button className="ap-expand" onClick={onToggle} title="展开写作工具">✍️</button>
+        <button className="ap-expand" onClick={onToggle} title="展开写作工具"><Icon name="pen" className="seal-ic--plain" /></button>
       </aside>
     )
   }
@@ -79,7 +82,7 @@ export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo,
   return (
     <aside className="assist-panel">
       <div className="ap-head">
-        <span className="ap-title">✍️ 写作工具</span>
+        <span className="ap-title"><Icon name="pen" className="seal-ic--sm" /> 写作工具</span>
         <div className="ap-head-r">
           {canUndo && <button className="ap-undo" onClick={undo}>↩ 撤回</button>}
           <button className="ap-collapse" onClick={onToggle} title="收起面板">▸</button>
@@ -104,16 +107,28 @@ export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo,
             {hasOptions ? (
               <div className="ap-options">
                 {options.length === 0 && <div className="ap-hint">没有生成候选，换一段试试。</div>}
-                {options.map((opt, i) => (
-                  <button
-                    key={i}
-                    className="ap-option"
-                    onClick={() => (action?.copy ? copyText(i, opt) : applyText(opt))}
-                  >
-                    <span className="ap-option-txt">{opt}</span>
-                    {action?.copy && <span className="ap-copied">{copiedIdx === i ? '已复制 ✓' : '复制'}</span>}
-                  </button>
-                ))}
+                {options.map((opt, i) => {
+                  const isObj = opt && typeof opt === 'object'
+                  const copyVal = isObj ? `${opt.quote}${opt.source ? ' —— ' + opt.source : ''}` : opt
+                  return (
+                    <button
+                      key={i}
+                      className="ap-option"
+                      onClick={() => (action?.copy ? copyText(i, copyVal) : applyText(opt))}
+                    >
+                      <span className="ap-option-txt">
+                        {isObj ? (
+                          <>
+                            <span className="ap-cite-quote">{opt.quote}</span>
+                            {opt.source && <span className="ap-cite-src">{opt.source}</span>}
+                            {opt.url && <span className="ap-cite-url">{opt.url}</span>}
+                          </>
+                        ) : opt}
+                      </span>
+                      {action?.copy && <span className="ap-copied">{copiedIdx === i ? '已复制 ✓' : '复制'}</span>}
+                    </button>
+                  )
+                })}
               </div>
             ) : (
               <div className="ap-result">{result}</div>
@@ -136,7 +151,7 @@ export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo,
             <div className="ap-actions">
               {ACTIONS.map(a => (
                 <span key={a.key} className="ap-action-wrap">
-                  <button className="ap-action" onClick={() => run(a, sel)}>{a.label}</button>
+                  <button className="ap-action" onClick={() => run(a, sel)}><Icon name={a.key} className="seal-ic--sm seal-ic--plain" /> {a.label}</button>
                   {a.help && (
                     <span className="ap-help" tabIndex={0} onClick={e => e.stopPropagation()}>
                       ?

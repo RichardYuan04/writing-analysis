@@ -14,6 +14,7 @@ import statistics
 import json
 from dotenv import load_dotenv
 import anthropic
+import httpx
 from google import genai as google_genai
 from google.genai import types as genai_types
 
@@ -40,6 +41,37 @@ anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 gemini_client = google_genai.Client(api_key=gemini_api_key) if gemini_api_key else None
+
+# DeepSeek（OpenAI 兼容接口），目前仅用于「读者视角」。配置全走 .env。
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+
+
+def _deepseek_chat(system: str, user: str, max_tokens: int) -> str:
+    """调 DeepSeek chat/completions（OpenAI 兼容），返回正式回复文本。
+    deepseek-v4-pro 是推理模型：reasoning_content 丢弃，只取 content；
+    故 max_tokens 要给足（推理 token + 正文）。"""
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("DEEPSEEK_API_KEY 未配置")
+    resp = httpx.post(
+        f"{DEEPSEEK_BASE_URL}/chat/completions",
+        headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                 "Content-Type": "application/json"},
+        json={
+            "model": DEEPSEEK_MODEL,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "max_tokens": max_tokens,
+            "stream": False,
+        },
+        timeout=120,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return (data["choices"][0]["message"].get("content") or "").strip()
 
 app = FastAPI()
 
@@ -715,6 +747,144 @@ def assist_expand(data: AssistRequest):
         f"原文：{data.text.strip()}" + _ctx_line(data.context)
     )
     return _assist_call(data, user, max_tokens=_cap(data.text, 3, 512, 2048), parse_options=False, model="claude-sonnet-4-6")
+
+
+# ── 读者视角 ──
+# 选一个人格读者，读完整篇 → 回一封第一人称的信。读整篇、不依赖选区、不注入 SOUL。
+READER_PERSONAS = {
+    "poet": {
+        "name": "诗人",
+        "system": (
+            "你是一位诗人。读一篇文章时，你只在意意象、节奏和语言的质地——"
+            "哪一句的画面让你停住，哪里的词太顺、像借来的，哪里的节奏泄了气。"
+        ),
+    },
+    "novelist": {
+        "name": "小说家",
+        "system": (
+            "你是一位小说家。读一篇文章时，你只在意人物、场景与细节——"
+            "作者是把它「演」出来了，还是在「讲」；现场是否立住，有没有一张脸、一个动作。"
+        ),
+    },
+    "philosopher": {
+        "name": "哲学家",
+        "system": (
+            "你是一位哲学家。读一篇文章时，你追问它底下「真正在问什么」，"
+            "把一个具体的场景上升为一个普遍的问题，温和地往深里带；你深化，不抬杠。"
+        ),
+    },
+    "editor": {
+        "name": "编辑",
+        "system": (
+            "你是一位编辑。读一篇文章时，你只看整体的骨架与气——"
+            "开头抓不抓人、中段塌不塌、结尾兑不兑现承诺、有没有一以贯之的线。用人话说，不抖术语。"
+        ),
+    },
+    "debater": {
+        "name": "辩论家",
+        "system": (
+            "你是一位辩论家。读一篇文章时，你专挑它的立论与逻辑漏洞——"
+            "那个不成立的「所以」、偷换的前提、回避的反例；你认真反驳，要求论断站得住。"
+        ),
+    },
+}
+
+_READER_TASK = (
+    "现在请你读完下面这篇文章，然后像一个真实的人，给作者本人写一封第一人称的信："
+    "有体温，不打分，不逐句批改；抓住真正打动你、或硌着你的地方来说，可以点名某个具体句子；"
+    "结尾不必强行总结。约 400–800 字。只输出信的正文，不要加标题或前缀。"
+)
+
+
+class AssistReaderRequest(BaseModel):
+    title: str = ""
+    content: str
+    persona: str
+
+
+@app.post("/assist/reader")
+def assist_reader(data: AssistReaderRequest):
+    content = (data.content or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="文章内容不能为空")
+    p = READER_PERSONAS.get(data.persona)
+    if not p:
+        raise HTTPException(status_code=400, detail="未知的读者")
+    sys_prompt = f"{p['system']}\n{_READER_TASK}"
+    user = f"标题：{(data.title or '无题').strip()}\n\n正文：\n{content}"
+    try:
+        # 读者视角走 DeepSeek（推理模型，max_tokens 给足以容纳推理 + 信文）
+        letter = _deepseek_chat(sys_prompt, user, max_tokens=5000)
+        return {"letter": letter}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[reader] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+
+# ── 找引文 ──
+# 为选中论断联网检索 2–3 条带出处的证据。用 web_search 服务端工具，不注入 SOUL。
+CITE_SYSTEM = (
+    "你是一名严谨的资料员。为用户给出的论断，用联网检索找 2–3 条真实、可查证的证据"
+    "（名人名句、科学依据或历史事实皆可）。每条必须有真实可查的出处；"
+    "宁缺毋滥，绝不编造名言、数据或年份；查不到确切出处就不要给。\n"
+    "只输出证据，每条单独一行，严格用以下格式（用 ||| 分隔三段，不要加编号或解释）：\n"
+    "证据原文 ||| 出处（作者/著作/机构）||| 来源链接\n"
+    "如果没有任何可确证的证据，只输出一行：无"
+)
+
+_WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search"}
+
+
+class AssistCiteRequest(BaseModel):
+    text: str
+    context: str = ""
+
+
+def _parse_cite_lines(raw: str) -> list:
+    """解析「原文 ||| 出处 ||| URL」每行一条 → [{quote, source, url}]，最多 3 条。"""
+    out = []
+    for line in (raw or "").splitlines():
+        s = line.strip()
+        if not s or "|||" not in s:
+            continue
+        parts = [p.strip() for p in s.split("|||")]
+        quote = parts[0]
+        source = parts[1] if len(parts) > 1 else ""
+        url = parts[2] if len(parts) > 2 else ""
+        if quote:
+            out.append({"quote": quote, "source": source, "url": url})
+    return out[:3]
+
+
+@app.post("/assist/cite")
+def assist_cite(data: AssistCiteRequest):
+    text = (data.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="选中文字不能为空")
+    user = f"论断：{text}" + _ctx_line(data.context)
+    messages = [{"role": "user", "content": user}]
+    try:
+        # web_search 是服务端工具，API 自跑检索循环；pause_turn 时回填续跑（上限 3 轮）
+        for _ in range(3):
+            message = anthropic_client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                system=CITE_SYSTEM,
+                tools=[_WEB_SEARCH_TOOL],
+                messages=messages,
+            )
+            if getattr(message, "stop_reason", None) != "pause_turn":
+                break
+            messages.append({"role": "assistant", "content": message.content})
+        raw = "".join(getattr(b, "text", "") for b in message.content).strip()
+        return {"options": _parse_cite_lines(raw)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[cite] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
 
 
 # ── 风格 SOUL 文档 ──
