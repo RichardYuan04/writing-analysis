@@ -552,10 +552,23 @@
 .daily-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; position: relative; }
 .daily-cite { font-size: 12px; color: var(--text-hint); font-style: italic; }
 .daily-next {
-  margin-left: auto; border: 1px solid var(--accent-light); background: var(--panel);
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--accent-light); background: var(--panel);
   color: var(--accent); font-size: 12px; padding: 4px 12px; border-radius: 20px; cursor: pointer;
 }
 .daily-next:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* 金句切换动效：旧句模糊上浮淡出 → 中途换字 → 新句去模糊下沉聚焦 */
+.daily-quote, .daily-cite {
+  transition: opacity .3s ease, transform .3s cubic-bezier(.22,.61,.36,1), filter .3s ease;
+  will-change: opacity, transform, filter;
+}
+.daily-cite { transition-delay: .05s; }      /* 署名稍迟一拍，更有层次 */
+.daily-quote.q-out, .daily-cite.q-out { opacity: 0; transform: translateY(-10px); filter: blur(5px); }
+.daily-quote.q-in,  .daily-cite.q-in  { opacity: 1; transform: translateY(0);     filter: blur(0); }
+/* 「换一句」图标每次点击完整转一圈（靠 React key 重挂触发） */
+.daily-next .dn-ico { display: inline-block; animation: dnSpin .5s cubic-bezier(.4,0,.2,1); }
+@keyframes dnSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 
 /* ── 写作页两栏布局（编辑器 + 右侧工具面板）── */
 .main--wide { max-width: 1120px; }
