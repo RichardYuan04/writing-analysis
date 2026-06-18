@@ -58,16 +58,35 @@
 }
 .theme-toggle:hover { border-color: var(--accent) !important; color: var(--accent) !important; background: var(--panel) !important; }
 .nav-gear {
-  margin-left: 6px; width: 32px; height: 32px; padding: 0;
+  margin-left: 6px; width: 50px; height: 50px; padding: 0;
   border: 1px solid var(--border); background: var(--panel); color: var(--text-secondary);
-  border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1;
+  border-radius: 50%; cursor: pointer; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center; transition: all 0.3s;
 }
+.nav-gear svg { display: block; }
 .nav-gear:hover { border-color: var(--accent); color: var(--accent); transform: rotate(40deg); }
 .nav-gear.active { border-color: var(--accent); color: var(--accent); }
 
 /* ── 设置页 ── */
 .settings-page { animation: fadeUp 0.5s cubic-bezier(.2,.8,.2,1); }
+.settings-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 18px;
+  padding: 9px 20px;
+  font-size: 14px; font-weight: 600;
+  color: var(--text-primary);
+  background: var(--card-grad);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s, color 0.2s;
+}
+.settings-back:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow);
+  transform: translateX(-2px);
+}
 @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .set-label { font-family: var(--font-display); font-style: italic; font-size: 13px; color: var(--accent); margin-bottom: 10px; }
 
@@ -1103,3 +1122,8 @@
   color: var(--text-primary) !important;
   box-shadow: var(--shadow-card) !important;
 }
+
+/* 找引文：一条证据卡的三段式排版 */
+.ap-cite-quote { display: block; color: var(--text-primary); }
+.ap-cite-src { display: block; margin-top: 4px; font-size: 12px; color: var(--accent); }
+.ap-cite-url { display: block; margin-top: 2px; font-size: 11px; color: var(--text-hint); word-break: break-all; }
