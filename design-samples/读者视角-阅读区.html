@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-family="desk" data-mode="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>读者视角 · 阅读区设计稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,500&family=Noto+Serif+SC:wght@400;500;600&family=Spectral:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --radius-sm:6px; --radius-md:10px; --radius-lg:16px;
+  --font-display:'Fraunces',Georgia,serif;
+  --font-serif:'Noto Serif SC',Georgia,serif;
+  --font-sans:'Spectral','PingFang SC',-apple-system,system-ui,sans-serif;
+  --card-grad:linear-gradient(160deg,var(--panel),var(--panel2));
+  --shadow-glow:0 0 36px -22px var(--glow);
+}
+:root[data-mode="dark"] { --vignette:rgba(0,0,0,.40); --shadow-card:0 22px 44px -28px rgba(0,0,0,.85); --paper-tint:rgba(255,255,255,.015); }
+:root[data-mode="light"]{ --vignette:transparent;       --shadow-card:0 18px 40px -28px rgba(40,34,24,.34); --paper-tint:rgba(120,90,40,.025); }
+
+:root[data-family="desk"][data-mode="dark"]{
+  --bg:#17110b;--bg2:#1e1610;--panel:#241a11;--panel2:#1b130c;
+  --text-primary:#f1e7d6;--text-secondary:#c6b39a;--text-hint:#8c7560;
+  --accent:#e89b50;--accent-light:#f3c781;--on-accent:#1a130c;
+  --border:#3a2c1d;--border-soft:#2e2317;--glow:rgba(232,155,80,.22);
+}
+:root[data-family="desk"][data-mode="light"]{
+  --bg:#f4ebdd;--bg2:#fbf5ea;--panel:#fffdf7;--panel2:#fbf4e8;
+  --text-primary:#2a2015;--text-secondary:#6c5945;--text-hint:#a8927b;
+  --accent:#c87a2e;--accent-light:#b07d28;--on-accent:#fffdf7;
+  --border:#e6d8c2;--border-soft:#efe4d2;--glow:rgba(200,122,46,.14);
+}
+:root[data-family="ocean"][data-mode="dark"]{
+  --bg:#0a1622;--bg2:#0e1d2e;--panel:#12283c;--panel2:#0d1f30;
+  --text-primary:#e6f0f7;--text-secondary:#a6c2d4;--text-hint:#5f7e92;
+  --accent:#3fa9d4;--accent-light:#7fd6e8;--on-accent:#06131f;
+  --border:#21455f;--border-soft:#18344a;--glow:rgba(63,169,212,.22);
+}
+:root[data-family="ocean"][data-mode="light"]{
+  --bg:#eaf4fa;--bg2:#f3f9fc;--panel:#ffffff;--panel2:#eef6fb;
+  --text-primary:#0e2a3d;--text-secondary:#3f6377;--text-hint:#8fadbe;
+  --accent:#1f87b8;--accent-light:#2a9fc8;--on-accent:#ffffff;
+  --border:#cfe3ef;--border-soft:#e1eef6;--glow:rgba(31,135,184,.13);
+}
+:root[data-family="sakura"][data-mode="dark"]{
+  --bg:#1a121a;--bg2:#241726;--panel:#2a1b2c;--panel2:#1f1420;
+  --text-primary:#f6e9f0;--text-secondary:#d3b4c6;--text-hint:#9a7d8e;
+  --accent:#e487ad;--accent-light:#f6b8d2;--on-accent:#1a0f15;
+  --border:#4a2c3d;--border-soft:#3a2230;--glow:rgba(228,135,173,.22);
+}
+:root[data-family="summer"][data-mode="dark"]{
+  --bg:#0c1710;--bg2:#102016;--panel:#15281b;--panel2:#0f1f14;
+  --text-primary:#e6f1e3;--text-secondary:#aac4ab;--text-hint:#5f7e64;
+  --accent:#5fae5a;--accent-light:#9fd07a;--on-accent:#08130b;
+  --border:#264a30;--border-soft:#1c3a24;--glow:rgba(95,174,90,.22);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-sans);
+  background:radial-gradient(120% 80% at 80% -10%,var(--bg2),var(--bg) 60%);
+  color:var(--text-primary);
+  min-height:100vh; padding:32px clamp(16px,4vw,48px) 64px;
+  transition:background .5s,color .5s;
+}
+.shell{max-width:1180px;margin:0 auto}
+
+/* ── 顶栏 ── */
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:8px;flex-wrap:wrap}
+.brand{font-family:var(--font-display);font-style:italic;font-weight:500;font-size:15px;color:var(--accent);letter-spacing:.3px}
+.brand small{font-style:normal;font-family:var(--font-sans);color:var(--text-hint);margin-left:8px;font-size:12px;letter-spacing:.5px}
+.theme-ctl{margin-left:auto;display:flex;align-items:center;gap:8px}
+.swatches{display:flex;gap:6px}
+.sw{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;position:relative;transition:transform .2s}
+.sw:hover{transform:scale(1.15)}
+.sw[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--glow)}
+.sw.desk{background:linear-gradient(135deg,#241a11,#e89b50)}
+.sw.ocean{background:linear-gradient(135deg,#12283c,#3fa9d4)}
+.sw.sakura{background:linear-gradient(135deg,#2a1b2c,#e487ad)}
+.sw.summer{background:linear-gradient(135deg,#15281b,#5fae5a)}
+.mode-btn{border:1px solid var(--border);background:var(--panel);color:var(--accent);font-size:12px;
+  padding:5px 12px;border-radius:16px;cursor:pointer;font-family:var(--font-sans)}
+.mode-btn:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+
+h1.page-h{font-family:var(--font-display);font-weight:600;font-size:clamp(26px,3.4vw,38px);
+  line-height:1.15;margin:14px 0 4px;letter-spacing:-.3px}
+.page-sub{color:var(--text-secondary);font-size:14px;max-width:60ch;line-height:1.7}
+.page-sub em{font-style:italic;color:var(--accent)}
+
+/* ── 当前文章引用条 ── */
+.doc-ref{display:flex;align-items:baseline;gap:10px;margin:18px 0 24px;
+  padding:10px 16px;border-left:2px solid var(--accent-light);background:var(--panel2);
+  border-radius:0 var(--radius-md) var(--radius-md) 0}
+.doc-ref .k{font-size:11px;letter-spacing:1px;color:var(--text-hint);text-transform:uppercase;flex-shrink:0}
+.doc-ref .t{font-family:var(--font-serif);font-size:15px;color:var(--text-primary)}
+.doc-ref .x{font-size:12.5px;color:var(--text-hint);font-style:italic}
+
+/* ── 两栏：读者班底 + 阅读区 ── */
+.layout{display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start}
+@media(max-width:860px){.layout{grid-template-columns:1fr}}
+
+/* 左：班底 */
+.roster{background:var(--card-grad);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:16px;position:relative;overflow:hidden}
+.roster::after{content:"";position:absolute;top:-40%;left:-10%;width:160px;height:160px;border-radius:50%;
+  background:var(--glow);filter:blur(30px);pointer-events:none}
+.roster-h{font-family:var(--font-serif);font-size:14px;font-weight:600;color:var(--accent);
+  margin-bottom:4px;position:relative}
+.roster-tip{font-size:12px;color:var(--text-hint);line-height:1.6;margin-bottom:14px;position:relative}
+.reader{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;cursor:pointer;
+  background:none;border:1px solid transparent;border-radius:var(--radius-md);padding:11px 12px;
+  margin-bottom:6px;transition:all .22s;position:relative;font-family:inherit;color:inherit}
+.reader:hover{background:var(--panel2);border-color:var(--border-soft);transform:translateX(2px)}
+.reader[aria-current="true"]{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-light)}
+.seal{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;
+  font-family:var(--font-serif);font-size:17px;color:var(--accent);
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 22%,var(--panel)),var(--panel2));
+  border:1px solid var(--accent-light);box-shadow:inset 0 0 8px -4px var(--glow)}
+.reader-meta .rn{font-family:var(--font-serif);font-size:14.5px;color:var(--text-primary);font-weight:500}
+.reader-meta .rn i{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:12px;color:var(--accent);margin-left:6px}
+.reader-meta .rc{font-size:11.5px;color:var(--text-hint);line-height:1.5;margin-top:2px}
+
+/* 右：阅读区 / 信 */
+.reading{min-height:520px;position:relative}
+.letter-wrap{position:relative}
+
+/* 空态 */
+.empty{height:100%;min-height:480px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;border:1px dashed var(--border);border-radius:var(--radius-lg);padding:40px;gap:14px;color:var(--text-hint)}
+.empty .quill{font-size:40px;opacity:.5;filter:grayscale(.2)}
+.empty .et{font-family:var(--font-display);font-style:italic;font-size:18px;color:var(--text-secondary)}
+.empty .ed{font-size:13px;max-width:32ch;line-height:1.7}
+
+/* 读取中 */
+.reading-state{height:100%;min-height:480px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.reading-state .who{font-family:var(--font-display);font-style:italic;font-size:18px;color:var(--accent)}
+.dots{display:flex;gap:7px}
+.dots span{width:8px;height:8px;border-radius:50%;background:var(--accent-light);animation:blink 1.2s infinite}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+.reading-state .rs-note{font-size:12.5px;color:var(--text-hint)}
+
+/* 信纸 */
+.letter{background:var(--card-grad);border:1px solid var(--border);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-card),var(--shadow-glow);padding:36px clamp(24px,4vw,48px) 30px;position:relative;overflow:hidden}
+.letter::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(transparent,transparent 33px,var(--paper-tint) 34px)}
+.letter::after{content:"";position:absolute;top:-60px;right:-40px;width:220px;height:220px;border-radius:50%;
+  background:var(--glow);filter:blur(50px);pointer-events:none;opacity:.7}
+.l-head{display:flex;align-items:center;gap:14px;margin-bottom:22px;position:relative}
+.l-seal{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--font-serif);font-size:24px;color:var(--accent);flex-shrink:0;
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 26%,var(--panel)),var(--panel2));
+  border:1.5px solid var(--accent-light);box-shadow:inset 0 0 12px -5px var(--glow),0 4px 14px -8px var(--glow);
+  animation:stamp .5s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes stamp{0%{transform:scale(1.6) rotate(-12deg);opacity:0}60%{opacity:1}100%{transform:scale(1) rotate(0)}}
+.l-id .who2{font-family:var(--font-serif);font-size:17px;font-weight:600;color:var(--text-primary)}
+.l-id .who2 i{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:13px;color:var(--accent);margin-left:8px}
+.l-id .lens{font-size:12px;color:var(--text-hint);margin-top:3px;font-style:italic}
+.salut{font-family:var(--font-serif);font-size:16px;color:var(--text-secondary);margin-bottom:14px;position:relative}
+.letter p.body{font-family:var(--font-serif);font-size:15.5px;line-height:2;color:var(--text-primary);
+  margin-bottom:15px;position:relative;text-align:justify}
+.letter p.body .mark{color:var(--accent);font-style:normal;border-bottom:1px solid var(--accent-light);padding-bottom:1px}
+.sign{margin-top:22px;text-align:right;position:relative}
+.sign .sn{font-family:var(--font-display);font-style:italic;font-size:18px;color:var(--accent)}
+.sign .sd{font-size:12px;color:var(--text-hint);margin-top:2px}
+
+/* 信底操作 */
+.l-acts{display:flex;gap:10px;margin-top:20px;position:relative;flex-wrap:wrap}
+.l-btn{border:1px solid var(--accent-light);background:var(--panel);color:var(--accent);font-size:12.5px;
+  padding:6px 14px;border-radius:18px;cursor:pointer;font-family:var(--font-sans);transition:all .2s}
+.l-btn:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.l-btn.ghost{border-color:var(--border);color:var(--text-hint)}
+
+/* 逐段浮现 */
+.reveal{opacity:0;transform:translateY(8px);animation:rise .6s ease forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+
+.foot{margin-top:36px;color:var(--text-hint);font-size:12px;line-height:1.8;border-top:1px solid var(--border-soft);padding-top:16px}
+.foot b{color:var(--text-secondary);font-weight:500}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">写作 · 读者视角<small>READER'S LETTER · 设计稿</small></div>
+    <div class="theme-ctl">
+      <div class="swatches" id="sw">
+        <button class="sw desk"   data-f="desk"   aria-current="true" title="书桌"></button>
+        <button class="sw ocean"  data-f="ocean"  title="海洋"></button>
+        <button class="sw sakura" data-f="sakura" title="樱花"></button>
+        <button class="sw summer" data-f="summer" title="盛夏"></button>
+      </div>
+      <button class="mode-btn" id="mode">☾ 夜</button>
+    </div>
+  </div>
+
+  <h1 class="page-h">请一个人，读完你这篇</h1>
+  <p class="page-sub">他不改你一个字，也不打分。他只是<em>认真读完</em>，然后像真有这么个人，给你回一封信。换一个人来读，在意的东西就全变了。</p>
+
+  <div class="doc-ref">
+    <span class="k">在读</span>
+    <span class="t">《夜里十一点的便利店》</span>
+    <span class="x">…我买了一瓶水，其实并不渴。收银员的"欢迎光临"像自动门一样准时，灯白得没有影子……</span>
+  </div>
+
+  <div class="layout">
+    <!-- 左：读者班底 -->
+    <aside class="roster">
+      <div class="roster-h">今天，请谁来读？</div>
+      <div class="roster-tip">五个人，五种灵魂。点一个，他会读完上面这篇。</div>
+      <div id="readers"></div>
+    </aside>
+
+    <!-- 右：阅读区 -->
+    <section class="reading" id="reading">
+      <div class="empty" id="empty">
+        <div class="quill">✒️</div>
+        <div class="et">还没有人读它。</div>
+        <div class="ed">从左边选一位读者，他会读完你这篇，给你回一封信——一封只属于你这篇文章的信。</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <b>这是设计稿</b>，信件内容为示例，用于感受五种人格读同一篇时的不同声音。实现时：读者<b>读整篇</b>（不依赖划词），<b>不读你的 SOUL 风格档案</b>（要像一个不认识你的真实读者才诚实），输出一封 200–400 字第一人称的信，由 Opus 生成。信件<b>只读、不替换</b>你的原文。
+  </div>
+</div>
+
+<script>
+const READERS = [
+  { key:'poet', glyph:'诗', name:'诗人', en:'the poet', care:'意象 · 节奏 · 语言的质地',
+    lens:'读你的画面与声音',
+    salut:'读你这篇时，我先听见了灯。',
+    sign:'一个还在你句子里听回声的人', signd:'读罢 · 灯下',
+    body:[
+      ['light','"灯白得没有影子"——这一句，我停了很久。']
+        .concat('你把便利店那种过亮的、不留余地的白，写成了一种连影子都无处可藏的处境。这比直接写"孤独"高明太多——影子本是会陪人的，而你这里，连影子都被这白光照没了。一个意象，顶得过十行抒情，你天生懂这个。'),
+      ['','"欢迎光临像自动门一样准时"也好。机械的礼貌，撞上一个其实并不渴的人，凉意就从这两句的缝里渗出来了。你最好的句子，都是这样——两个不相干的东西轻轻一碰，你没作任何解释，可读的人脊背先懂了。这是诗的手法，你在不自觉地用。'],
+      ['mark','可中段那句"夜色温柔地包裹着我"，我得拦一下你']
+        .concat('——它太顺了，顺得像从别人的散文里借来的一件外套，不合你的身。你前半篇用的都是冷的、准的、带棱角的词：白、自动门、准时、没有影子；忽然冒出一个"温柔地包裹"，调子一下就软塌了，像一支克制的曲子里跑进了一个滥俗的转音。'),
+      ['','节奏上也露了同样的破绽。你前面句子短、顿挫多，像日光灯每隔几秒的那种轻微闪烁；一到抒情处，句子忽然拉长、变绵，前面攒的那股冷劲就泄光了。如果你舍得，让这份温柔也染上便利店的白——去写一种"过亮的、不太敢相信的温柔"，它就既是你的，也是这家店的了。'],
+      ['','总之，你是有耳朵的人。剩下要练的，只是别在快够到那个词的时候，松手去抓一个更现成、更安全的。']
+    ]
+  },
+  { key:'novelist', glyph:'叙', name:'小说家', en:'the novelist', care:'人物 · 场景 · 是"演"还是在"讲"',
+    lens:'读你有没有把它演出来',
+    salut:'我是当一篇小说读的。读完只想问你一句：那个收银员，长什么样？',
+    sign:'一个想多读两页的人', signd:'读罢 · 意犹未尽',
+    body:[
+      ['','你开篇就懂了小说最难教的那一点诀窍——"买了一瓶水，其实并不渴"。你没有写"我很孤独"，你写了一个动作；孤独不必你来宣布，它自己就从这个多余的举动里站了出来。一个不渴的人，付钱买一瓶水，这一下，人物就活了，比任何形容词都活。'],
+      ['mark','可惜，你只让他活了这一句，后面就开始"讲"了']
+        .concat('——"在城市的褶皱里寻找自己的坐标"，这是作者在旁白，不是人物在场。读者刚被你领进那家便利店，脚还没站稳，你就把他请了出去，让他站在店门外，听你做总结。小说的命门就在这儿：你一旦开始替读者归纳意义，现场就死了。'),
+      ['','把镜头还给店里吧。那个准时说"欢迎光临"的收银员——他是头也不抬地刷着手机，还是正盯着收款机出神？他那句"欢迎光临"，是冲你说的，还是冲门口的感应器说的？这一笔下去，你原先那句"像自动门一样准时"就不再只是个比喻，而是有血有肉的一幕了。'],
+      ['','还有：那么晚的便利店，真的只有你一个人吗？给我第二个深夜来买东西的人。哪怕只是一个买烟的，一个在关东煮前挑了很久、最后什么也没买就走的人——有了第二个人，你的孤独才有了参照，才不是悬空的自怜，而成了"一屋子各自孤独的人，谁也不看谁"。那才是便利店真正的样子。'],
+      ['','你已经握着最好的开头：一个动作，一盏白灯，一句准时的问候。再给我一两张脸、一两个动作，把那句架空的"温柔"换成一个落地的瞬间，这篇就从"一段感受"长成"一个夜晚"了。说真的，我是想多读两页的。']
+    ]
+  },
+  { key:'philosopher', glyph:'哲', name:'哲学家', en:'the philosopher', care:'你这篇底下，真正在问什么',
+    lens:'读你文字底下的问题',
+    salut:'你写的是便利店。但你真正在问的，是另一件事。',
+    sign:'一个陪你多想一层的人', signd:'读罢 · 仍在想',
+    body:[
+      ['','一个并不渴的人，在深夜走进便利店，买一瓶并不需要的水，只为换那一声"欢迎光临"——哪怕他清楚，这声音是机器念的，是说给所有人听的。你几乎是无意间，触到了一个很深的问题：当一句问候对谁都一样、谁来都给时，它还算不算"被迎接"？'],
+      ['mark','你这篇里藏着一个未经检验的默认：被无差别地接纳，胜过完全不被接纳']
+        .concat('——可正是这里，有一个值得你停下来的岔口。人在深夜真正要的，究竟是"被看见"，还是仅仅"不被拒绝"？这是两样东西。"被看见"要求对方认得出你、在意你这一个人；"不被拒绝"只需要一扇不上锁的门。便利店慷慨地给得起后者，却永远给不起前者。'),
+      ['','而你这篇，恰恰在这两者之间摇摆，却还没向自己承认你站在哪边。你写它"温柔"，可你心里清楚，这温柔里有一点你不太愿意说破的东西：它之所以不赶你走，并不是因为它接纳你，而是因为它根本不在乎你是谁。'],
+      ['','这就逼出一个更难的追问：那一晚，你要的到底是一个人，还是一盏灯？一个人会认得你、会为你停留，可也正因如此，他会离开、会让你失望；而一盏便利店的灯，永远亮着，永不熄灭，代价是它永远不会认识你。你选了灯。这个选择里有安全，也有一种很深的放弃——你是不是已经累到，宁可要一个不会拒绝你的东西，也不敢再去要一个可能拒绝你的人？'],
+      ['','我不替你回答。但若你愿意把这一层真正想透，再回头改这篇，它就会从"一个孤独的夜晚"，变成"一个关于我们究竟在向谁讨温暖"的问题。到那时，便利店就不只是便利店了。']
+    ]
+  },
+  { key:'editor', glyph:'编', name:'编辑', en:'the editor', care:'骨架 · 开头中段结尾立不立',
+    lens:'读你这篇撑不撑得住',
+    salut:'稿子看完了，按整体结构跟你说几句，不绕弯。',
+    sign:'一个替读者替你把关的人', signd:'读罢 · 就稿论稿',
+    body:[
+      ['','先说优点：开头很稳。"买了一瓶水，其实并不渴"——一句话就是一个钩子，一个动作把人按进了情绪里，读者第一行就站到了你这边。这种开头我求之不得；多少稿子写了三百字还没进门，你一句就进了。'],
+      ['mark','问题出在中段——它塌了']
+        .concat('——你从一家具体的便利店，毫无过渡地荡到"城市的褶皱""人生的坐标"这种大词上，镜头一下子从眼前的收银台拉到了万米高空，前面好不容易攒起来的那点具体的凉气，全在这一拉之间散光了。读者刚走进店，你就把他拽上天台谈人生，他会冷场，会出戏。'),
+      ['','这类毛病几乎都是同一句话：该具体的时候你抽象了。补救其实不难——别让情绪一次性冲到顶。把那段感慨拆开，掺回场景里去：让"坐标"这种念头，从一个具体的动作里自己冒出来（比如你盯着货架上一排排码得整整齐齐的商品，忽然觉得连它们都比你更有位置），而不是由你直接喊出来。'],
+      ['','再说结尾。你用一瓶水开的局，最好还用那瓶水来收，这是结构上的闭环。可你现在的结尾，是另起一段的抒情，跟开头那瓶水彻底脱了钩。那瓶水后来怎么了？拧开喝了一口，还是一直拎在手里、最后忘在了台子上？一个动作就能把整篇兜回来，让开头的钩子变成结尾的回响。'],
+      ['','整体评价：你有很好的"点"，缺一根把点串起来的"线"。开头和结尾各守一头，中段别急着升华，老老实实把它留在便利店里——这篇就立住了。']
+    ]
+  },
+  { key:'debater', glyph:'辩', name:'辩论家', en:'the debater', care:'立论 · 逻辑的漏洞',
+    lens:'读你的论断站不站得住',
+    salut:'别的我先不管。你这篇里藏了一个论断，我不打算放过它。',
+    sign:'那个跟你抬杠的人', signd:'读罢 · 等你反驳',
+    body:[
+      ['','你写："便利店是城市里唯一不赶人走的地方，所以它最温柔。"画面我认，情绪我也认，可中间这个"所以"，我不认。这是全篇逻辑上最脆的一根梁，我倒要敲一敲。'],
+      ['mark','不赶你走，根本不等于温柔——它很可能只是不在乎']
+        .concat('——你看，"不赶人走"是一个事实，"温柔"是一个评价，你在这两者之间偷偷塞了一个"所以"，仿佛它们之间有必然的因果。可便利店之所以不赶任何人走，恰恰是因为它谁都不认识、对谁都无所谓：它欢迎你，也用同一句话欢迎下一个醉汉、下一个加班的人、下一个无处可去的人。这种"欢迎"里没有你，只有"顾客"这个空位。把无差别的冷漠，读成专门给你的温柔，这一步逻辑是不成立的。'),
+      ['','我替你把反例摆出来：你家的灯，会在你回去时为你而亮；你母亲的唠叨，是因为对象是"你"才唠叨。这些才认人、才有对象——可你偏偏觉得它们不够温柔，反倒觉得一家谁都接纳的便利店温柔。这恰恰说明：你那一晚真正要的，根本不是"温柔"，而是"不被要求、不被追问、不必解释"。便利店给你的不是温柔，是豁免。'],
+      ['','所以你这个论断，要么改，要么深化。改，就老实承认"它不赶我走，这就够了"，别拔高到"温柔"；深化，就比原来更狠一层——承认温柔的根本不是便利店，而是那个连无差别的冷漠都甘愿当温柔来领受的、那一晚的你。后面这条路，比你原来的句子疼得多，也真得多。'],
+      ['','一句话：把"所以它最温柔"这个判断先撤下来，要么换成更准的，要么换成更狠的。它现在这副样子，撑不住。等你反驳我。']
+    ]
+  },
+];
+
+const readersEl = document.getElementById('readers');
+const reading = document.getElementById('reading');
+let current = null;
+
+READERS.forEach((r,i)=>{
+  const b=document.createElement('button');
+  b.className='reader'; b.dataset.key=r.key;
+  b.innerHTML=`<span class="seal">${r.glyph}</span>
+    <span class="reader-meta">
+      <span class="rn">${r.name}<i>${r.en}</i></span>
+      <span class="rc">${r.care}</span>
+    </span>`;
+  b.addEventListener('click',()=>pick(r.key));
+  readersEl.appendChild(b);
+});
+
+function pick(key){
+  const r=READERS.find(x=>x.key===key);
+  current=key;
+  [...readersEl.children].forEach(c=>c.setAttribute('aria-current', c.dataset.key===key));
+  // 读取中
+  reading.innerHTML=`<div class="reading-state">
+    <div class="who"><i>${r.name}</i> 正在读…</div>
+    <div class="dots"><span></span><span></span><span></span></div>
+    <div class="rs-note">读完整篇，约一两句话的工夫</div>
+  </div>`;
+  setTimeout(()=>renderLetter(r),1100);
+}
+
+function renderLetter(r){
+  const paras=r.body.map((p,idx)=>{
+    const cls=p[0]; const text=p.slice(1).join('');
+    const inner = cls ? text.replace(/^([^—。"][^，。]*[—。])?/, m=>m? `<span class="${cls}">${m}</span>`:m) : text;
+    // 简单标注：cls 命中时给整段首句描边
+    const html = cls==='light'||cls==='mark'
+      ? `<span class="mark">${text.split('——')[0]}${text.includes('——')?'——':''}</span>${text.split('——').slice(1).join('——')}`
+      : text;
+    return `<p class="body reveal" style="animation-delay:${.15+idx*.22}s">${html}</p>`;
+  }).join('');
+
+  reading.innerHTML=`<div class="letter-wrap"><article class="letter">
+    <div class="l-head">
+      <div class="l-seal">${r.glyph}</div>
+      <div class="l-id">
+        <div class="who2">${r.name}<i>${r.en}</i></div>
+        <div class="lens">${r.lens}</div>
+      </div>
+    </div>
+    <div class="salut reveal" style="animation-delay:.05s">${r.salut}</div>
+    ${paras}
+    <div class="sign reveal" style="animation-delay:${.2+r.body.length*.22}s">
+      <div class="sn">— ${r.sign}</div>
+      <div class="sd">${r.signd}</div>
+    </div>
+    <div class="l-acts reveal" style="animation-delay:${.35+r.body.length*.22}s">
+      <button class="l-btn" onclick="pick('${r.key}')">↻ 让他再读一遍</button>
+      <button class="l-btn ghost">⎘ 收进信匣</button>
+      <button class="l-btn ghost" onclick="换人()">← 换个人读</button>
+    </div>
+  </article></div>`;
+}
+function 换人(){ document.querySelector('.roster').scrollIntoView({behavior:'smooth',block:'center'}); }
+window.换人=换人; window.pick=pick;
+
+// 主题切换
+document.getElementById('sw').addEventListener('click',e=>{
+  const btn=e.target.closest('.sw'); if(!btn)return;
+  document.documentElement.dataset.family=btn.dataset.f;
+  [...document.querySelectorAll('.sw')].forEach(s=>s.setAttribute('aria-current',s===btn));
+});
+document.getElementById('mode').addEventListener('click',e=>{
+  const root=document.documentElement;
+  const dark=root.dataset.mode==='dark';
+  root.dataset.mode=dark?'light':'dark';
+  e.target.textContent=dark?'☀ 昼':'☾ 夜';
+});
+</script>
+</body>
+</html>
