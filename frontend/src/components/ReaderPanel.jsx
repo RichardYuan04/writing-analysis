@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { assistReader } from '../api'
 
 // 5 个固定人格读者。字徽 + 名 + 一行「在意什么」。
@@ -66,7 +67,7 @@ export default function ReaderPanel({ getDoc, collapsed, onToggle }) {
         </div>
       </aside>
 
-      {reader && (
+      {reader && createPortal(
         <div className="modal-overlay" onClick={close}>
           <div className="letter-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="lm-head">
@@ -86,7 +87,8 @@ export default function ReaderPanel({ getDoc, collapsed, onToggle }) {
               <button className="ap-ghost" onClick={close}>合上信</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
