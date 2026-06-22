@@ -29,21 +29,22 @@ export default function Write({ onSaved, prefill, onBack }) {
 
   // 初始内容只算一次：prefill 优先，其次本地草稿（兼容旧的纯文本草稿）
   const [init] = useState(() => {
-    if (prefill) return { blocks: plainTextToBlocks(prefill), title: '', date: today, at: '', restored: false }
+    if (prefill) return { blocks: plainTextToBlocks(prefill), title: '', date: today, at: '', restored: false, letters: [] }
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (raw) {
         const d = JSON.parse(raw)
         const blocks = (d.blocks && d.blocks.length) ? d.blocks : (d.content ? plainTextToBlocks(d.content) : undefined)
-        return { blocks, title: d.title || '', date: d.date || today, at: d.at || '', restored: !!(d.title || d.content || (d.blocks && d.blocks.length)) }
+        return { blocks, title: d.title || '', date: d.date || today, at: d.at || '', restored: !!(d.title || d.content || (d.blocks && d.blocks.length)), letters: d.letters || [] }
       }
     } catch { /* ignore */ }
-    return { blocks: undefined, title: '', date: today, at: '', restored: false }
+    return { blocks: undefined, title: '', date: today, at: '', restored: false, letters: [] }
   })
 
   const [title, setTitle] = useState(init.title)
   const [date, setDate] = useState(init.date)
   const [docBlocks, setDocBlocks] = useState(init.blocks || [{ type: 'paragraph', content: [] }])
+  const [letters, setLetters] = useState(init.letters || [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -83,11 +84,11 @@ export default function Write({ onSaved, prefill, onBack }) {
     setAutoState('saving')
     const t = setTimeout(() => {
       const at = new Date().toTimeString().slice(0, 5)
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, blocks: docBlocks, date, at }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, blocks: docBlocks, date, at, letters }))
       setAutoState('saved'); setAutoAt(at)
     }, 800)
     return () => clearTimeout(t)
-  }, [title, docBlocks, date, mood, plainText])
+  }, [title, docBlocks, date, mood, plainText, letters])
 
   // 换一句：旧句模糊上浮淡出 → 中途换字 → 新句去模糊下沉聚焦
   const nextQuote = () => {
@@ -114,6 +115,15 @@ export default function Write({ onSaved, prefill, onBack }) {
     })
   }
 
+  // 把一封读者来信留存到当前稿子（上限 5；持久化由自动保存/存草稿/发布兜底）
+  const saveLetterLocal = (reader, content) => {
+    setLetters((ls) => {
+      if (ls.length >= 5 || !content) return ls
+      const id = 'lt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+      return [...ls, { id, persona: reader.key, persona_name: reader.name, content, created_at: new Date().toISOString() }]
+    })
+  }
+
   // 点开草稿箱里的某份 → 载入编辑器
   const openDraft = (d) => {
     const blocks = parseRich(d.content_rich, d.content)
@@ -125,6 +135,7 @@ export default function Write({ onSaved, prefill, onBack }) {
     setUndoStack([])
     richRef.current?.setBlocks(blocks)
     setDocBlocks(blocks)
+    setLetters(d.letters || [])
     setAutoState('saved')
     setTimeout(() => richRef.current?.focus(), 0)
   }
@@ -145,6 +156,7 @@ export default function Write({ onSaved, prefill, onBack }) {
     const empty = [{ type: 'paragraph', content: [] }]
     richRef.current?.setBlocks(empty)
     setDocBlocks(empty)
+    setLetters([])
     setAutoState('idle'); setAutoAt('')
     localStorage.removeItem(DRAFT_KEY)
   }
@@ -163,7 +175,7 @@ export default function Write({ onSaved, prefill, onBack }) {
     setSaving(true); setError('')
     try {
       const res = await createEssay({
-        title, content: plainText, date, content_rich: JSON.stringify(docBlocks),
+        title, content: plainText, date, content_rich: JSON.stringify(docBlocks), letters,
       })
       localStorage.removeItem(DRAFT_KEY)
       if (draftId) { try { await deleteDraft(draftId) } catch { /* ignore */ } setDraftId(null) }
@@ -259,7 +271,7 @@ export default function Write({ onSaved, prefill, onBack }) {
           canUndo={undoStack.length > 0}
         />
         <DraftPanel
-          current={{ title, content: plainText, date, content_rich: JSON.stringify(docBlocks) }}
+          current={{ title, content: plainText, date, content_rich: JSON.stringify(docBlocks), letters }}
           draftId={draftId}
           onSaved={(d) => setDraftId(d.id)}
           onOpen={openDraft}
@@ -271,6 +283,8 @@ export default function Write({ onSaved, prefill, onBack }) {
           getDoc={() => ({ title, content: plainText })}
           collapsed={readerPanelCollapsed}
           onToggle={() => setReaderPanelCollapsed((c) => !c)}
+          onSaveLetter={saveLetterLocal}
+          savedCount={letters.length}
         />
       </div>
 
