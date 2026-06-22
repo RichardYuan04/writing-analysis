@@ -100,6 +100,7 @@ class Essay(Base):
     emotion_detail = Column(Text)   # JSON: {joy, gratitude, love, neutral, surprise, anger, ...}
     mood_card = Column(Text)        # JSON: {tone, tone_emoji, keywords[], ai_reply, ai_reply_status, generated_at}
     content_rich = Column(Text)     # JSON: BlockNote 块文档（富文本）；content 仍存纯文本供分析/搜索
+    letters = Column(Text)          # JSON 数组：读者来信，每封 {id,persona,persona_name,content,created_at}
     created_at = Column(DateTime, default=datetime.now)
 
 
@@ -119,6 +120,7 @@ class Draft(Base):
     title = Column(String(200))
     content = Column(Text)
     content_rich = Column(Text)                   # JSON: BlockNote 块文档
+    letters = Column(Text)          # JSON 数组：随稿子流转的读者来信
     date = Column(String(10))                    # YYYY-MM-DD（用户设定的写作日期）
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now)
@@ -164,6 +166,26 @@ def setup_fts():
 setup_fts()
 
 
+MAX_LETTERS = 5
+
+
+def _parse_letters(raw) -> list:
+    try:
+        v = json.loads(raw) if raw else []
+        return v if isinstance(v, list) else []
+    except Exception:
+        return []
+
+
+def _dump_letters(items) -> str:
+    return json.dumps((items or [])[:MAX_LETTERS], ensure_ascii=False)
+
+
+def _gen_letter_id() -> str:
+    import uuid
+    return "lt_" + uuid.uuid4().hex[:10]
+
+
 def migrate_db():
     """为旧表补加新列（幂等）"""
     with engine.connect() as conn:
@@ -174,6 +196,7 @@ def migrate_db():
             ("emotion_detail",     "TEXT"),
             ("mood_card",          "TEXT"),
             ("content_rich",       "TEXT"),
+            ("letters",            "TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE essays ADD COLUMN {col} {typ}"))
@@ -183,6 +206,11 @@ def migrate_db():
         # drafts 表补列
         try:
             conn.execute(text("ALTER TABLE drafts ADD COLUMN content_rich TEXT"))
+            conn.commit()
+        except Exception:
+            pass  # 列已存在
+        try:
+            conn.execute(text("ALTER TABLE drafts ADD COLUMN letters TEXT"))
             conn.commit()
         except Exception:
             pass  # 列已存在
@@ -334,10 +362,13 @@ class EssayCreate(BaseModel):
     content: str
     date: str
     content_rich: str | None = None
+    letters: list | None = None
 
 
 @app.post("/essays")
 def create_essay(data: EssayCreate):
+    if data.letters and len(data.letters) > MAX_LETTERS:
+        raise HTTPException(status_code=400, detail="读者信箱最多 5 封")
     analysis = analyze_text(data.content)
     em = compute_emotion_breakdown(data.content) or {}
     mood = compute_mood_card(data.content, em=em, analysis=analysis)
@@ -354,6 +385,7 @@ def create_essay(data: EssayCreate):
         sentiment_negative=em.get("negative"),
         emotion_detail=json.dumps(em["detail"]) if em.get("detail") else None,
         mood_card=json.dumps(mood, ensure_ascii=False),
+        letters=_dump_letters(data.letters or []),
     )
     session.add(essay)
     session.commit()
@@ -468,6 +500,7 @@ def get_essay(essay_id: int):
         "sentiment": essay.sentiment_score,
         "emotion_detail": json.loads(essay.emotion_detail) if essay.emotion_detail else None,
         "mood_card": json.loads(essay.mood_card) if essay.mood_card else None,
+        "letters": _parse_letters(essay.letters),
         **analysis,
     }
     session.close()
