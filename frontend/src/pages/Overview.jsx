@@ -4,7 +4,7 @@ import WordCloud from '../components/WordCloud'
 import HeatMap from '../components/HeatMap'
 import TodayReview from '../components/TodayReview'
 import WelcomeCard from '../components/WelcomeCard'
-import Icon from '../components/Icon'
+import Icon, { Face } from '../components/Icon'
 import HintBar from '../components/HintBar'
 import SentimentTimeline from '../components/SentimentTimeline'
 import DateRangePicker from '../components/DateRangePicker'
@@ -175,7 +175,7 @@ export default function Overview({ onSelect, onWrite, startDate, endDate, onRang
             </div>
             <div className="card">
               <div className="card-num">
-                <span className={`sent-dot ${sentimentClass(stats.avg_sentiment)}`} />
+                <Face mood={sentimentClass(stats.avg_sentiment)} className="mood-face--lg" />
                 {sentimentLabel(stats.avg_sentiment)}
               </div>
               <div className="card-label">整体情绪</div>

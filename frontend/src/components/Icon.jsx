@@ -90,3 +90,24 @@ export function SealChar({ char, className = '' }) {
     </span>
   )
 }
+
+// 情绪线性脸：圆脸版。三种表情统一用主题色（currentColor=accent），
+// 不按情绪分色——靠嘴角区分积极/平静/消极。mood ∈ positive | neutral | negative
+const FACE_MOUTH = {
+  positive: <path d="M8.4 13.8 Q12 16.8 15.6 13.8" />,
+  neutral: <line x1="8.8" y1="14.6" x2="15.2" y2="14.6" />,
+  negative: <path d="M8.4 15.4 Q12 12.4 15.6 15.4" />,
+}
+export function Face({ mood = 'neutral', className = '' }) {
+  return (
+    <span className={`mood-face ${className}`}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
+           strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="8.6" />
+        <circle cx="9.2" cy="10.2" r="0.95" fill="currentColor" stroke="none" />
+        <circle cx="14.8" cy="10.2" r="0.95" fill="currentColor" stroke="none" />
+        {FACE_MOUTH[mood] || FACE_MOUTH.neutral}
+      </svg>
+    </span>
+  )
+}
