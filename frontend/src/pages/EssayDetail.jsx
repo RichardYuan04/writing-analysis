@@ -6,6 +6,7 @@ import MoodCard from '../components/MoodCard'
 import RichEditor from '../components/RichEditor'
 import RichViewer from '../components/RichViewer'
 import { blocksToPlainText, parseRich } from '../components/richSchema'
+import ReaderLetterbox from '../components/ReaderLetterbox'
 
 export default function EssayDetail({ id, onBack }) {
   const [essay, setEssay] = useState(null)
@@ -132,6 +133,13 @@ export default function EssayDetail({ id, onBack }) {
           {essay.mood_card && (
             <MoodCard mood={essay.mood_card} variant="persisted" />
           )}
+
+          <ReaderLetterbox
+            essayId={essay.id}
+            title={essay.title}
+            content={essay.content}
+            initialLetters={essay.letters || []}
+          />
 
           <div className="detail-analysis">
             <section className="section">
