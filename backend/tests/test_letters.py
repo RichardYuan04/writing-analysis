@@ -33,3 +33,35 @@ def test_get_essay_without_letters_returns_empty_list(client, db):
     eid = _seed_essay()
     g = client.get(f"/essays/{eid}")
     assert g.json()["letters"] == []
+
+
+def test_append_letter_returns_array_with_new(client, db):
+    eid = _seed_essay()
+    r = client.post(f"/essays/{eid}/letters",
+                    json={"persona": "poet", "persona_name": "诗人", "content": "来信"})
+    assert r.status_code == 200
+    arr = r.json()
+    assert len(arr) == 1
+    assert arr[0]["persona"] == "poet"
+    assert arr[0]["id"] and arr[0]["created_at"]
+
+
+def test_append_sixth_letter_rejected(client, db):
+    eid = _seed_essay()
+    for i in range(5):
+        client.post(f"/essays/{eid}/letters",
+                    json={"persona": "poet", "persona_name": "诗人", "content": str(i)})
+    r = client.post(f"/essays/{eid}/letters",
+                    json={"persona": "poet", "persona_name": "诗人", "content": "x"})
+    assert r.status_code == 400
+
+
+def test_delete_letter_idempotent(client, db):
+    eid = _seed_essay()
+    a = client.post(f"/essays/{eid}/letters",
+                    json={"persona": "poet", "persona_name": "诗人", "content": "来信"}).json()
+    lid = a[0]["id"]
+    r = client.delete(f"/essays/{eid}/letters/{lid}")
+    assert r.status_code == 200 and r.json() == []
+    r2 = client.delete(f"/essays/{eid}/letters/{lid}")
+    assert r2.status_code == 200 and r2.json() == []

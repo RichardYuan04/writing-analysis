@@ -507,6 +507,50 @@ def get_essay(essay_id: int):
     return result
 
 
+class LetterIn(BaseModel):
+    persona: str
+    persona_name: str = ""
+    content: str
+
+
+@app.post("/essays/{essay_id}/letters")
+def add_essay_letter(essay_id: int, data: LetterIn):
+    session = Session()
+    essay = session.query(Essay).filter(Essay.id == essay_id).first()
+    if not essay:
+        session.close()
+        raise HTTPException(status_code=404, detail="Not found")
+    letters = _parse_letters(essay.letters)
+    if len(letters) >= MAX_LETTERS:
+        session.close()
+        raise HTTPException(status_code=400, detail="读者信箱已满，最多 5 封")
+    letters.append({
+        "id": _gen_letter_id(),
+        "persona": data.persona,
+        "persona_name": data.persona_name,
+        "content": data.content,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    })
+    essay.letters = _dump_letters(letters)
+    session.commit()
+    session.close()
+    return letters
+
+
+@app.delete("/essays/{essay_id}/letters/{letter_id}")
+def delete_essay_letter(essay_id: int, letter_id: str):
+    session = Session()
+    essay = session.query(Essay).filter(Essay.id == essay_id).first()
+    if not essay:
+        session.close()
+        raise HTTPException(status_code=404, detail="Not found")
+    letters = [lt for lt in _parse_letters(essay.letters) if lt.get("id") != letter_id]
+    essay.letters = _dump_letters(letters)
+    session.commit()
+    session.close()
+    return letters
+
+
 class EssayUpdate(BaseModel):
     title: str
     content: str
