@@ -1139,6 +1139,8 @@ def _draft_dict(d) -> dict:
 def create_draft(data: DraftRequest):
     if not (data.content or "").strip():
         raise HTTPException(status_code=400, detail="草稿内容不能为空")
+    if data.letters and len(data.letters) > MAX_LETTERS:
+        raise HTTPException(status_code=400, detail="读者信箱最多 5 封")
     session = Session()
     now = datetime.now()
     d = Draft(title=data.title or "", content=data.content, content_rich=data.content_rich,
@@ -1162,6 +1164,8 @@ def list_drafts():
 
 @app.put("/drafts/{draft_id}")
 def update_draft(draft_id: int, data: DraftRequest):
+    if data.letters and len(data.letters) > MAX_LETTERS:
+        raise HTTPException(status_code=400, detail="读者信箱最多 5 封")
     session = Session()
     d = session.query(Draft).filter(Draft.id == draft_id).first()
     if not d:

@@ -76,3 +76,11 @@ def test_draft_with_letters_roundtrip(client, db):
     assert len(c.json()["letters"]) == 1
     lst = client.get("/drafts").json()
     assert any(len(d.get("letters", [])) == 1 for d in lst)
+
+
+def test_draft_rejects_over_5_letters(client, db):
+    letters = [{"id": f"lt_{i}", "persona": "editor", "persona_name": "编辑",
+                "content": "x", "created_at": "t"} for i in range(6)]
+    r = client.post("/drafts", json={"title": "T", "content": "内容",
+                                     "date": "2026-06-22", "letters": letters})
+    assert r.status_code == 400
