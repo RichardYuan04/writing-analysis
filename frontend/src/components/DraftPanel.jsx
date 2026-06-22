@@ -26,7 +26,7 @@ export default function DraftPanel({ current, draftId, onSaved, onOpen, onDraftR
     if (!canSave || busy) return
     setBusy(true)
     try {
-      const payload = { title: current.title || '', content: current.content, date: current.date || '', content_rich: current.content_rich }
+      const payload = { title: current.title || '', content: current.content, date: current.date || '', content_rich: current.content_rich, letters: current.letters }
       const r = draftId ? await updateDraft(draftId, payload) : await createDraft(payload)
       onSaved?.(r.data)
       setSavedTip(true); setTimeout(() => setSavedTip(false), 1600)
