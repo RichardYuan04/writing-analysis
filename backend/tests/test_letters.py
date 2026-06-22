@@ -65,3 +65,14 @@ def test_delete_letter_idempotent(client, db):
     assert r.status_code == 200 and r.json() == []
     r2 = client.delete(f"/essays/{eid}/letters/{lid}")
     assert r2.status_code == 200 and r2.json() == []
+
+
+def test_draft_with_letters_roundtrip(client, db):
+    letters = [{"id": "lt_1", "persona": "editor", "persona_name": "编辑",
+                "content": "来信", "created_at": "t"}]
+    c = client.post("/drafts", json={"title": "T", "content": "内容",
+                                     "date": "2026-06-22", "letters": letters})
+    assert c.status_code == 200
+    assert len(c.json()["letters"]) == 1
+    lst = client.get("/drafts").json()
+    assert any(len(d.get("letters", [])) == 1 for d in lst)

@@ -1119,6 +1119,7 @@ class DraftRequest(BaseModel):
     content: str
     date: str = ""
     content_rich: str | None = None
+    letters: list | None = None
 
 
 def _draft_dict(d) -> dict:
@@ -1127,6 +1128,7 @@ def _draft_dict(d) -> dict:
         "title": d.title or "",
         "content": d.content or "",
         "content_rich": d.content_rich,
+        "letters": _parse_letters(d.letters),
         "date": d.date or "",
         "created_at": d.created_at.isoformat() if d.created_at else None,
         "updated_at": d.updated_at.isoformat() if d.updated_at else None,
@@ -1140,7 +1142,8 @@ def create_draft(data: DraftRequest):
     session = Session()
     now = datetime.now()
     d = Draft(title=data.title or "", content=data.content, content_rich=data.content_rich,
-              date=data.date or "", created_at=now, updated_at=now)
+              date=data.date or "", letters=_dump_letters(data.letters or []),
+              created_at=now, updated_at=now)
     session.add(d)
     session.commit()
     result = _draft_dict(d)
@@ -1167,6 +1170,7 @@ def update_draft(draft_id: int, data: DraftRequest):
     d.title = data.title or ""
     d.content = data.content
     d.content_rich = data.content_rich
+    d.letters = _dump_letters(data.letters or [])
     d.date = data.date or ""
     d.updated_at = datetime.now()
     session.commit()
