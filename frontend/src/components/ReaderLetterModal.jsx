@@ -12,11 +12,14 @@ export default function ReaderLetterModal({ reader, getDoc, onClose, onSave, sav
   const [letter, setLetter] = useState('')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveErr, setSaveErr] = useState('')
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
     if (!reader) return
     let alive = true
+    setSaving(false); setSaveErr('')
     const { title, content } = getDoc()
     if (!content.trim()) { setError('先写点东西，再请人来读。'); setLetter(''); setLoading(false); setSaved(false); return }
     setLoading(true); setLetter(''); setError(''); setSaved(false)
@@ -28,7 +31,13 @@ export default function ReaderLetterModal({ reader, getDoc, onClose, onSave, sav
   }, [reader, nonce])
 
   if (!reader) return null
-  const doSave = () => { onSave(reader, letter); setSaved(true) }
+  // 等后端确认再标「已留存」；失败给出提示，不再乐观假成功
+  const doSave = async () => {
+    setSaveErr(''); setSaving(true)
+    try { await onSave(reader, letter); setSaved(true) }
+    catch { setSaveErr('留存失败，请稍后再试') }
+    finally { setSaving(false) }
+  }
 
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
@@ -48,8 +57,9 @@ export default function ReaderLetterModal({ reader, getDoc, onClose, onSave, sav
           {!loading && !error && onSave && (
             saved ? <span className="lm-saved">已留存 ✓</span>
               : saveDisabled ? <span className="lm-hint">{saveHint}</span>
-                : <button className="ap-btn" onClick={doSave}>留存这封信</button>
+                : <button className="ap-btn" onClick={doSave} disabled={saving}>{saving ? '留存中…' : '留存这封信'}</button>
           )}
+          {saveErr && <span className="lm-hint">{saveErr}</span>}
           <button className="ap-ghost" onClick={onClose}>合上信</button>
         </div>
       </div>

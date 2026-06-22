@@ -15,11 +15,10 @@ export default function ReaderLetterbox({ essayId, title, content, initialLetter
   const [reader, setReader] = useState(null)
   const atLimit = letters.length >= 5
 
+  // 不吞错：失败让浮层的 doSave 捕获并提示，避免「假已留存」
   const handleSave = async (rd, text) => {
-    try {
-      const r = await saveEssayLetter(essayId, { persona: rd.key, persona_name: rd.name, content: text })
-      setLetters(r.data)
-    } catch { /* 忽略；上限会被后端拦下 */ }
+    const r = await saveEssayLetter(essayId, { persona: rd.key, persona_name: rd.name, content: text })
+    setLetters(r.data)
   }
   const remove = async (lid) => {
     try { const r = await deleteEssayLetter(essayId, lid); setLetters(r.data) } catch { /* ignore */ }
