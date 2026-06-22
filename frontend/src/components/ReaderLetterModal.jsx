@@ -18,7 +18,7 @@ export default function ReaderLetterModal({ reader, getDoc, onClose, onSave, sav
     if (!reader) return
     let alive = true
     const { title, content } = getDoc()
-    if (!content.trim()) { setError('先写点东西，再请人来读。'); setLetter(''); setLoading(false); return }
+    if (!content.trim()) { setError('先写点东西，再请人来读。'); setLetter(''); setLoading(false); setSaved(false); return }
     setLoading(true); setLetter(''); setError(''); setSaved(false)
     assistReader({ title, content, persona: reader.key })
       .then(r => { if (alive) { setLetter(r.data.letter || ''); setLoading(false) } })
