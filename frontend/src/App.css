@@ -1213,6 +1213,9 @@
 .seal-ic--sm { width: 22px; height: 22px; border-width: 1px; border-radius: 5px; }
 .seal-ic--sm svg { width: 14px; height: 14px; }
 .seal-ic--plain { border: none; background: none; box-shadow: none; }
+/* 单字印章字徽 */
+.seal-ch { font-family: var(--font-serif); font-weight: 600; color: var(--accent); line-height: 1; font-size: 13px; }
+.seal-ic svg + .seal-ch, .seal-ic .seal-ch { display: block; }
 
 .ap-title, .dp-title, .rp-title { display: inline-flex; align-items: center; gap: 7px; }
 .ap-action { display: inline-flex; align-items: center; gap: 6px; }

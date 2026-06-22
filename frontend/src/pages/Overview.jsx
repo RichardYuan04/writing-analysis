@@ -4,6 +4,7 @@ import WordCloud from '../components/WordCloud'
 import HeatMap from '../components/HeatMap'
 import TodayReview from '../components/TodayReview'
 import WelcomeCard from '../components/WelcomeCard'
+import Icon from '../components/Icon'
 import HintBar from '../components/HintBar'
 import SentimentTimeline from '../components/SentimentTimeline'
 import DateRangePicker from '../components/DateRangePicker'
@@ -216,7 +217,7 @@ export default function Overview({ onSelect, onWrite, startDate, endDate, onRang
         <h2>所有随笔</h2>
 
         <div className="search-wrap">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><Icon name="search" className="seal-ic--sm seal-ic--plain" /></span>
           <input
             className="search-input"
             placeholder="搜索标题或正文内容…"

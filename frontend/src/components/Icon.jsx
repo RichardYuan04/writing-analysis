@@ -59,6 +59,13 @@ const GLYPHS = {
       <line x1="12" y1="6.5" x2="12" y2="18" />
     </>
   ),
+  // 搜索：放大镜
+  search: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6" />
+      <line x1="15" y1="15" x2="20" y2="20" />
+    </>
+  ),
 }
 
 export default function Icon({ name, className = '' }) {
@@ -70,6 +77,16 @@ export default function Icon({ name, className = '' }) {
            strokeLinecap="round" strokeLinejoin="round">
         {glyph}
       </svg>
+    </span>
+  )
+}
+
+// 单字印章字徽：同一方印面里放一个汉字（与 诗/叙/哲 字徽同源），
+// 用于写作画像「风格解读」等以一个字概括维度的场景。
+export function SealChar({ char, className = '' }) {
+  return (
+    <span className={`seal-ic ${className}`}>
+      <b className="seal-ch">{char}</b>
     </span>
   )
 }
