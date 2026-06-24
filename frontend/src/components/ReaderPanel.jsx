@@ -47,7 +47,15 @@ export default function ReaderPanel({ getDoc, collapsed, onToggle, onSaveLetter,
             </button>
           ))}
         </div>
-        {onSaveLetter && <div className="rp-count">已留存 {savedCount}/5 封{atLimit ? ' · 已满' : ''}</div>}
+        {onSaveLetter && (
+          <div className="rp-count">
+            <span className="rp-count-label">读者信箱</span>
+            <span className="rp-dots">
+              {[0, 1, 2, 3, 4].map((i) => <i key={i} className={i < savedCount ? 'on' : ''} />)}
+            </span>
+            <span className="rp-count-n">{atLimit ? '已满' : `${savedCount}/5`}</span>
+          </div>
+        )}
       </aside>
 
       <ReaderLetterModal

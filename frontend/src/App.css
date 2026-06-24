@@ -1256,3 +1256,18 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .rb-card-more { display: inline-block; margin-top: 6px; font-size: 11.5px; color: var(--accent); }
+
+/* 写作页读者视角：信箱容量小指示器（5 个小方印） */
+.rp-count {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-soft);
+  font-size: 11.5px; color: var(--text-hint);
+}
+.rp-count-label { letter-spacing: .3px; }
+.rp-dots { display: inline-flex; gap: 4px; }
+.rp-dots i {
+  width: 8px; height: 8px; border-radius: 2px;
+  border: 1px solid var(--accent-light); background: transparent; transition: background .2s;
+}
+.rp-dots i.on { background: var(--accent); }
+.rp-count-n { margin-left: auto; color: var(--accent); font-family: var(--font-display); font-style: italic; }
