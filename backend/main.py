@@ -46,12 +46,14 @@ gemini_client = google_genai.Client(api_key=gemini_api_key) if gemini_api_key el
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+# 半成品仓库（分类/主题命名）专用模型：默认回落主模型，可在 .env 单独设更便宜的非推理档
+DEEPSEEK_VAULT_MODEL = os.getenv("DEEPSEEK_VAULT_MODEL", DEEPSEEK_MODEL)
 
 
-def _deepseek_chat(system: str, user: str, max_tokens: int) -> str:
+def _deepseek_chat(system: str, user: str, max_tokens: int, model: str | None = None) -> str:
     """调 DeepSeek chat/completions（OpenAI 兼容），返回正式回复文本。
     deepseek-v4-pro 是推理模型：reasoning_content 丢弃，只取 content；
-    故 max_tokens 要给足（推理 token + 正文）。"""
+    故 max_tokens 要给足（推理 token + 正文）。model 缺省走主模型 DEEPSEEK_MODEL。"""
     if not DEEPSEEK_API_KEY:
         raise RuntimeError("DEEPSEEK_API_KEY 未配置")
     resp = httpx.post(
@@ -59,7 +61,7 @@ def _deepseek_chat(system: str, user: str, max_tokens: int) -> str:
         headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                  "Content-Type": "application/json"},
         json={
-            "model": DEEPSEEK_MODEL,
+            "model": model or DEEPSEEK_MODEL,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -1691,7 +1693,7 @@ def split_paragraphs(content: str) -> list:
 
 # ── Claude Haiku 批量分类 ──
 
-def classify_fragments_with_claude(paragraphs: list) -> list:
+def classify_fragments(paragraphs: list) -> list:
     if not paragraphs:
         return []
 
@@ -1729,12 +1731,12 @@ def classify_fragments_with_claude(paragraphs: list) -> list:
 只返回JSON数组，不要其他文字。"""
 
     try:
-        message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}]
+        raw = _deepseek_chat(
+            "你是写作素材分析师。严格只返回 JSON 数组，不要任何解释或多余文字。",
+            prompt,
+            max_tokens=6000,
+            model=DEEPSEEK_VAULT_MODEL,
         )
-        raw = message.content[0].text.strip()
         # 去掉 markdown 代码块
         raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
         # 提取第一个 JSON 数组（防止前后有多余文字）
@@ -1757,7 +1759,7 @@ def analyze_essay_fragments(essay_id: int):
             return
 
         paragraphs = split_paragraphs(essay.content)
-        classifications = classify_fragments_with_claude(paragraphs) if paragraphs else []
+        classifications = classify_fragments(paragraphs) if paragraphs else []
 
         for item in classifications:
             if not item.get("is_valuable"):
@@ -1830,12 +1832,12 @@ def recluster_themes():
 {{"0": "父亲与沉默", "1": "城市孤独感"}}
 只返回JSON，不要其他文字。"""
 
-        message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=512,
-            messages=[{"role": "user", "content": naming_prompt}]
+        raw = _deepseek_chat(
+            "你给写作片段的主题簇命名。严格只返回 JSON 对象，不要任何解释或多余文字。",
+            naming_prompt,
+            max_tokens=3000,
+            model=DEEPSEEK_VAULT_MODEL,
         )
-        raw = message.content[0].text.strip()
         if raw.startswith("```"):
             raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
         theme_names = json.loads(raw)
