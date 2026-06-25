@@ -31,7 +31,7 @@ export const deepAnalysis = () => api.post('/stats/deep-analysis')
 
 export const getStyleProfile = () => api.get('/style-profile')
 export const generateStyleProfile = (essayIds) => api.post('/style-profile/generate', { essay_ids: essayIds })
-export const saveStyleProfile = (content) => api.put('/style-profile', { content })
+export const saveStyleProfile = (data) => api.put('/style-profile', data)
 
 export const getOverview = (startDate, endDate) => {
   const params = {}
