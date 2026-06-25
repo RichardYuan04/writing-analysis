@@ -736,14 +736,20 @@ class AssistRequest(BaseModel):
     style_profile: str = ""
 
 
-def _assist_system(style_profile: str) -> str:
-    sp = (style_profile or "").strip()
-    if sp:
-        style_line = (f"该作者的写作风格为：{sp}。"
+def _assist_system(bundle: dict) -> str:
+    content = (bundle.get("content") or "").strip()
+    taboo = (bundle.get("taboo") or DEFAULT_TABOO).strip()
+    samples = bundle.get("samples") or []
+    if content:
+        style_line = (f"该作者的写作风格为：{content}。"
                       "所有建议必须与该风格保持一致，不要改变作者的声音和语气。")
     else:
         style_line = "保持与原文及上下文一致的语气和风格，不要改变作者的声音。"
-    return f"你是写作助手。{style_line}\n直接输出建议内容，不要解释、不要加前缀。"
+    parts = [f"你是写作助手。{style_line}", taboo]
+    if samples:
+        parts.append("参考该作者的原文片段，学其语感、不要照抄内容：\n" + "\n---\n".join(samples))
+    parts.append("直接输出建议内容，不要解释、不要加前缀。")
+    return "\n".join(parts)
 
 
 DEFAULT_TABOO = (
@@ -804,7 +810,7 @@ def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options:
     if not text:
         raise HTTPException(status_code=400, detail="选中文字不能为空")
     # system 为 None 时默认注入 SOUL；显式传入（如比喻）则用传入的，不注入 SOUL
-    sys_prompt = system if system is not None else _assist_system(_load_soul_content())
+    sys_prompt = system if system is not None else _assist_system(_load_soul_bundle())
     try:
         message = anthropic_client.messages.create(
             model=model,

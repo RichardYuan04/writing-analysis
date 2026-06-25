@@ -61,3 +61,26 @@ def test_generate_stores_golden_samples_not_taboo(client, db, seed_essays, mock_
     g = client.get("/style-profile").json()
     assert len(g["golden_samples"]) >= 1
     assert g["taboo"] == main.DEFAULT_TABOO                 # 养成不写 taboo
+
+
+import json as _json
+
+
+def test_assist_reduce_injects_taboo_and_samples(client, db, mock_anthropic):
+    s = main.Session(); s.query(main.StyleProfile).delete()
+    s.add(main.StyleProfile(id=1, content="克制短句", rationale="{}", source_essay_ids="[]",
+                            taboo="禁止用 ZZZ", golden_samples=_json.dumps(["样例片段ABC"], ensure_ascii=False)))
+    s.commit(); s.close()
+    mock_anthropic.set_text("缩短后的文字")
+    client.post("/assist/reduce", json={"text": "一段要缩减的较长文字。", "context": ""})
+    sysp = mock_anthropic.captured["system"]
+    assert "克制短句" in sysp        # SOUL 正文
+    assert "ZZZ" in sysp             # 用户禁止项
+    assert "样例片段ABC" in sysp     # 黄金样例
+
+
+def test_assist_reduce_no_profile_still_has_default_taboo(client, db, mock_anthropic):
+    s = main.Session(); s.query(main.StyleProfile).delete(); s.commit(); s.close()
+    mock_anthropic.set_text("x")
+    client.post("/assist/reduce", json={"text": "一段要缩减的较长文字。", "context": ""})
+    assert "值得注意的是" in mock_anthropic.captured["system"]   # 降级也带 DEFAULT_TABOO
