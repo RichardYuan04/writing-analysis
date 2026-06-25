@@ -112,6 +112,8 @@ class StyleProfile(Base):
     source_essay_ids = Column(Text)              # JSON 数组：本次养成用了哪几篇
     generated_at = Column(DateTime, default=datetime.now)
     user_edited = Column(Integer, default=0)     # 0/1
+    golden_samples = Column(Text)   # JSON 数组：养成时抽的 2–3 段黄金样例原文
+    taboo = Column(Text)            # 可编辑禁止项；空则回落 DEFAULT_TABOO
 
 
 class Draft(Base):
@@ -214,6 +216,14 @@ def migrate_db():
             conn.commit()
         except Exception:
             pass  # 列已存在
+
+        # style_profile 表补列（SOUL 升级：黄金样例 + 可编辑禁止项）
+        for col in ("golden_samples", "taboo"):
+            try:
+                conn.execute(text(f"ALTER TABLE style_profile ADD COLUMN {col} TEXT"))
+                conn.commit()
+            except Exception:
+                pass
 
 
 def compute_emotion_breakdown(content: str):
@@ -712,6 +722,37 @@ def _assist_system(style_profile: str) -> str:
     return f"你是写作助手。{style_line}\n直接输出建议内容，不要解释、不要加前缀。"
 
 
+DEFAULT_TABOO = (
+    "请规避以下「AI 腔」写法：\n"
+    "- 套话与软化词：值得注意的是 / 综上所述·总而言之 / 某种程度上·可能地 / 此外 / 「不是 X，而是 Y」「不仅…而是…」。\n"
+    "- 拔高与升华：「标志着…关键时刻」「象征着…」「反映了更广泛的趋势」；别用动名词堆抽象深刻。\n"
+    "- 空泛/促销词：至关重要、格局（抽象用）、展现、充满活力、令人叹为观止、迷人的。\n"
+    "- 句法节律：别三项排比成瘾（改两项或四项）；别连续等长句；破折号别当节奏拐杖。\n"
+    "- 对读者：别解释自己的比喻；别过度软化（「可能会产生影响」→「影响了」）；别绕开「是/有」。\n"
+    "- 结构：别每段都用整齐总结收尾；别强行在结尾升华或喊口号。"
+)
+
+
+def _load_soul_bundle() -> dict:
+    """读 SOUL 正文 + 禁止项 + 黄金样例。禁止项为空回落 DEFAULT_TABOO。"""
+    session = Session()
+    try:
+        row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+        if not row:
+            return {"content": "", "taboo": DEFAULT_TABOO, "samples": []}
+        try:
+            samples = json.loads(row.golden_samples) if row.golden_samples else []
+        except Exception:
+            samples = []
+        return {
+            "content": (row.content or "").strip(),
+            "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
+            "samples": samples if isinstance(samples, list) else [],
+        }
+    finally:
+        session.close()
+
+
 def _load_soul_content() -> str:
     """从库里读当前 SOUL 文档的 content；没有则返回空串（走降级分支）。"""
     session = Session()
@@ -1104,6 +1145,10 @@ def get_style_profile():
         ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
     except Exception:
         ids = []
+    try:
+        golden = json.loads(row.golden_samples) if row.golden_samples else []
+    except Exception:
+        golden = []
     result = {
         "exists": True,
         "content": row.content or "",
@@ -1111,6 +1156,8 @@ def get_style_profile():
         "source_essay_ids": ids,
         "generated_at": row.generated_at.isoformat() if row.generated_at else None,
         "user_edited": int(row.user_edited or 0),
+        "golden_samples": golden if isinstance(golden, list) else [],
+        "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
         "new_essays_since": new_count,
     }
     session.close()
@@ -1118,7 +1165,8 @@ def get_style_profile():
 
 
 class StyleProfileUpdateRequest(BaseModel):
-    content: str
+    content: str | None = None
+    taboo: str | None = None
 
 
 @app.put("/style-profile")
@@ -1128,24 +1176,28 @@ def update_style_profile(req: StyleProfileUpdateRequest):
     if not row:
         row = StyleProfile(id=1, source_essay_ids="[]", rationale="{}")
         session.add(row)
-    row.content = (req.content or "").strip()
-    row.user_edited = 1
-    row.generated_at = datetime.now()
+    if req.content is not None:
+        row.content = (req.content or "").strip()
+        row.user_edited = 1
+        row.generated_at = datetime.now()
+    if req.taboo is not None:
+        row.taboo = req.taboo
     session.commit()
+    try:
+        golden = json.loads(row.golden_samples) if row.golden_samples else []
+    except Exception:
+        golden = []
     try:
         ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
     except Exception:
         ids = []
-    try:
-        rationale = json.loads(row.rationale) if row.rationale else {}
-    except Exception:
-        rationale = {}
     result = {
-        "content": row.content,
-        "rationale": rationale,
+        "content": row.content or "",
+        "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
+        "golden_samples": golden if isinstance(golden, list) else [],
         "source_essay_ids": ids,
-        "generated_at": row.generated_at.isoformat(),
-        "user_edited": 1,
+        "user_edited": int(row.user_edited or 0),
+        "generated_at": row.generated_at.isoformat() if row.generated_at else None,
     }
     session.close()
     return result
