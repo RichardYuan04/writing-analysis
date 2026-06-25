@@ -13,6 +13,7 @@ export default function SoulDocPanel() {
   const [picking, setPicking] = useState(false)     // 是否在选篇态
   const [selectedIds, setSelectedIds] = useState([])
   const [draft, setDraft] = useState('')            // 可编辑文本
+  const [tabooDraft, setTabooDraft] = useState('')
   const [busy, setBusy] = useState('')              // '' | 'generating' | 'saving'
   const [showRationale, setShowRationale] = useState(false)
   const [savedTip, setSavedTip] = useState(false)
@@ -20,7 +21,7 @@ export default function SoulDocPanel() {
   useEffect(() => {
     getStyleProfile().then(r => {
       setProfile(r.data)
-      if (r.data.exists) { setDraft(r.data.content || ''); setSelectedIds(r.data.source_essay_ids || []) }
+      if (r.data.exists) { setDraft(r.data.content || ''); setSelectedIds(r.data.source_essay_ids || []); setTabooDraft(r.data.taboo || '') }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
@@ -32,6 +33,7 @@ export default function SoulDocPanel() {
       const r = await generateStyleProfile(selectedIds)
       setProfile({ exists: true, ...r.data, new_essays_since: 0 })
       setDraft(r.data.content || '')
+      setTabooDraft(r.data.taboo || tabooDraft)
       setPicking(false)
     } catch { /* 保留旧文档，不破坏 */ }
     setBusy('')
@@ -40,8 +42,18 @@ export default function SoulDocPanel() {
   const save = async () => {
     setBusy('saving')
     try {
-      const r = await saveStyleProfile(draft)
+      const r = await saveStyleProfile({ content: draft })
       setProfile(p => ({ ...p, exists: true, ...r.data }))
+      setSavedTip(true); setTimeout(() => setSavedTip(false), 1600)
+    } catch { /* ignore */ }
+    setBusy('')
+  }
+
+  const saveTaboo = async () => {
+    setBusy('saving')
+    try {
+      const r = await saveStyleProfile({ taboo: tabooDraft })
+      setProfile(p => ({ ...p, ...r.data }))
       setSavedTip(true); setTimeout(() => setSavedTip(false), 1600)
     } catch { /* ignore */ }
     setBusy('')
@@ -119,6 +131,23 @@ export default function SoulDocPanel() {
             <button className="soul-btn-ghost" onClick={() => setPicking(true)}>重新选篇养成</button>
             {savedTip && <span className="soul-saved">已保存 ✓</span>}
           </div>
+
+          <div className="soul-sub">
+            <div className="soul-sub-h">禁止项（去 AI 腔，对所有写作工具生效，可改）</div>
+            <textarea className="soul-textarea" value={tabooDraft} onChange={e => setTabooDraft(e.target.value)} rows={7} />
+            <button className="soul-btn-primary" disabled={busy === 'saving' || tabooDraft === (profile.taboo || '')} onClick={saveTaboo}>
+              {busy === 'saving' ? '保存中…' : '保存禁止项'}
+            </button>
+          </div>
+
+          {profile.golden_samples && profile.golden_samples.length > 0 && (
+            <div className="soul-sub">
+              <div className="soul-sub-h">黄金样例（养成时抽的原文，注入工具当语感参照）</div>
+              <div className="soul-samples">
+                {profile.golden_samples.map((s, i) => <blockquote key={i} className="soul-sample">{s}</blockquote>)}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
