@@ -665,6 +665,30 @@ def _sample_excerpts(essays, per_essay_cap: int = 400, total_cap: int = 800) -> 
     return "\n\n".join(parts)
 
 
+def _golden_samples(essays, n: int = 3, cap: int = 200) -> list:
+    """抽 n 段代表性原文（每篇取第一段，保留断句），每段 ≤cap 字。"""
+    out = []
+    for e in essays:
+        if len(out) >= n:
+            break
+        content = (e.content or "").strip()
+        if not content:
+            continue
+        para = next((p.strip() for p in re.split(r"\n\s*\n|\n", content) if p.strip()), "")
+        if not para:
+            continue
+        out.append(para[:cap] + "…" if len(para) > cap else para)
+    return out
+
+
+def _parse_or_empty(raw) -> list:
+    try:
+        v = json.loads(raw) if raw else []
+        return v if isinstance(v, list) else []
+    except Exception:
+        return []
+
+
 _SOUL_LABELS = [("节奏", "rhythm"), ("意象", "imagery"), ("情绪", "emotion"),
                 ("用词", "diction"), ("手法", "signature")]
 
@@ -1066,6 +1090,8 @@ def _build_soul_prompt(portrait: dict, excerpts: str) -> str:
         "  1) 句子节奏与长短  2) 意象/感官/比喻倾向  3) 情绪表达方式（克制/外放/叙事）\n"
         "  4) 用词（口语/书面/文学性）  5) 标志性手法（标点、留白、重复、转折等）\n"
         "第二步（输出）：把以上压缩成一段 100–200 字的密集风格指令，可直接注入用于指挥 AI 模仿该风格写作。\n\n"
+        "凡涉及频率/程度（句长、标点、用词偏好），一律依据上面给出的统计数字来表述"
+        "（如『平均句长 X 字，多用短句』『标点偏简』），不要凭印象自行估计或夸大某个特征。\n\n"
         "请严格按以下格式输出，不要使用 JSON、不要加任何额外说明文字（风格串里可自由使用引号和标点）：\n"
         "【SOUL】\n（这里写 100-200 字的风格指令）\n\n"
         "【节奏】（一句话）\n【意象】（一句话）\n【情绪】（一句话）\n【用词】（一句话）\n【手法】（一句话）"
@@ -1114,6 +1140,7 @@ def generate_style_profile(req: StyleProfileGenerateRequest):
     row.source_essay_ids = json.dumps([e.id for e in essays])
     row.generated_at = datetime.now()
     row.user_edited = 0
+    row.golden_samples = json.dumps(_golden_samples(essays), ensure_ascii=False)
     session.commit()
     result = {
         "content": row.content,
@@ -1121,6 +1148,7 @@ def generate_style_profile(req: StyleProfileGenerateRequest):
         "source_essay_ids": [e.id for e in essays],
         "generated_at": row.generated_at.isoformat(),
         "user_edited": 0,
+        "golden_samples": _parse_or_empty(row.golden_samples),
     }
     session.close()
     return result

@@ -51,3 +51,13 @@ def test_load_soul_bundle_defaults(client, db):
     b = main._load_soul_bundle()
     assert b["taboo"] == main.DEFAULT_TABOO
     assert b["samples"] == []
+
+
+def test_generate_stores_golden_samples_not_taboo(client, db, seed_essays, mock_anthropic):
+    mock_anthropic.set_text("【SOUL】\n克制、短句、少抒情。\n【节奏】短\n【意象】具体\n【情绪】克制\n【用词】口语\n【手法】留白")
+    r = client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    assert r.status_code == 200
+    assert len(r.json()["golden_samples"]) >= 1            # 抽到了样例
+    g = client.get("/style-profile").json()
+    assert len(g["golden_samples"]) >= 1
+    assert g["taboo"] == main.DEFAULT_TABOO                 # 养成不写 taboo
