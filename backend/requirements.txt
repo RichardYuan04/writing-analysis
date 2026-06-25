@@ -10,3 +10,7 @@ python-dotenv
 jieba
 transformers
 torch
+# 半成品仓库：embedding 向量（sentence-transformers）+ 主题聚类（scikit-learn KMeans）。
+# 缺失时 /vault/analyze 会逐篇在算向量处抛错回滚，导致随笔永远停在「待分析」。
+sentence-transformers
+scikit-learn
