@@ -39,3 +39,15 @@ def test_get_returns_golden_samples(client, db):
     _seed_profile(golden=json.dumps(["片段一", "片段二"], ensure_ascii=False))
     g = client.get("/style-profile").json()
     assert g["golden_samples"] == ["片段一", "片段二"]
+
+
+def test_get_golden_samples_bad_json_falls_back(client, db):
+    _seed_profile(golden="{broken")
+    assert client.get("/style-profile").json()["golden_samples"] == []
+
+
+def test_load_soul_bundle_defaults(client, db):
+    _seed_profile(taboo=None, golden=None)
+    b = main._load_soul_bundle()
+    assert b["taboo"] == main.DEFAULT_TABOO
+    assert b["samples"] == []
