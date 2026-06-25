@@ -764,14 +764,10 @@ def _load_soul_bundle() -> dict:
         row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
         if not row:
             return {"content": "", "taboo": DEFAULT_TABOO, "samples": []}
-        try:
-            samples = json.loads(row.golden_samples) if row.golden_samples else []
-        except Exception:
-            samples = []
         return {
             "content": (row.content or "").strip(),
             "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
-            "samples": samples if isinstance(samples, list) else [],
+            "samples": _parse_or_empty(row.golden_samples),
         }
     finally:
         session.close()
@@ -1173,10 +1169,6 @@ def get_style_profile():
         ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
     except Exception:
         ids = []
-    try:
-        golden = json.loads(row.golden_samples) if row.golden_samples else []
-    except Exception:
-        golden = []
     result = {
         "exists": True,
         "content": row.content or "",
@@ -1184,7 +1176,7 @@ def get_style_profile():
         "source_essay_ids": ids,
         "generated_at": row.generated_at.isoformat() if row.generated_at else None,
         "user_edited": int(row.user_edited or 0),
-        "golden_samples": golden if isinstance(golden, list) else [],
+        "golden_samples": _parse_or_empty(row.golden_samples),
         "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
         "new_essays_since": new_count,
     }
@@ -1212,17 +1204,13 @@ def update_style_profile(req: StyleProfileUpdateRequest):
         row.taboo = req.taboo
     session.commit()
     try:
-        golden = json.loads(row.golden_samples) if row.golden_samples else []
-    except Exception:
-        golden = []
-    try:
         ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
     except Exception:
         ids = []
     result = {
         "content": row.content or "",
         "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
-        "golden_samples": golden if isinstance(golden, list) else [],
+        "golden_samples": _parse_or_empty(row.golden_samples),
         "source_essay_ids": ids,
         "user_edited": int(row.user_edited or 0),
         "generated_at": row.generated_at.isoformat() if row.generated_at else None,
