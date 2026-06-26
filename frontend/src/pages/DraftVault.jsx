@@ -103,7 +103,34 @@ export default function DraftVault({ onWrite }) {
   }
 
   const handleContinue = (fragment) => {
-    onWrite(fragment.content)
+    onWrite({ text: fragment.content, hints: fragment.ai_hint ? [fragment.ai_hint] : [] })
+  }
+
+  const MERGE_CAP = 8
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])   // 保留点选顺序
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      if (prev.length >= MERGE_CAP) return prev          // 到上限不再加
+      return [...prev, id]
+    })
+  }
+  const exitSelect = () => { setSelectMode(false); setSelectedIds([]) }
+
+  // 按点选顺序、以空行拼接片段开一篇；ai_hint 收进 hints 横幅
+  const mergeContinue = (frags) => {
+    const picked = frags.slice(0, MERGE_CAP)
+    onWrite({
+      text: picked.map(f => f.content).join('\n\n'),
+      hints: picked.map(f => f.ai_hint).filter(Boolean),
+    })
+  }
+  const handleMergeSelected = () => {
+    const byId = new Map(fragments.map(f => [f.id, f]))
+    const picked = selectedIds.map(id => byId.get(id)).filter(Boolean)
+    if (picked.length) mergeContinue(picked)
   }
 
   const visibleFragments = activecat
@@ -304,6 +331,26 @@ export default function DraftVault({ onWrite }) {
           {/* ── 类别视图 ── */}
           {!showHidden && status.total_fragments > 0 && view === 'cat' && (
             <>
+              {/* 多选开关 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <button
+                  onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+                  style={{
+                    padding: '5px 14px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                    border: `1px solid ${selectMode ? 'var(--accent)' : 'var(--border)'}`,
+                    background: selectMode ? tint('var(--accent)', 14) : 'transparent',
+                    color: selectMode ? 'var(--accent)' : 'var(--text-secondary)', fontWeight: 600,
+                  }}
+                >
+                  {selectMode ? '✓ 多选中' : '☑ 多选合并'}
+                </button>
+                {selectMode && (
+                  <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>
+                    勾选多个片段，一起开一篇（最多 {MERGE_CAP} 段）
+                  </span>
+                )}
+              </div>
+
               {/* 类别筛选 pills */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
                 <CategoryPill
@@ -331,6 +378,9 @@ export default function DraftVault({ onWrite }) {
                     fragment={f}
                     onHide={handleHide}
                     onContinue={handleContinue}
+                    selectMode={selectMode}
+                    selected={selectedIds.includes(f.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
               </div>
@@ -347,11 +397,34 @@ export default function DraftVault({ onWrite }) {
                   key={cluster.id}
                   cluster={cluster}
                   onContinue={handleContinue}
+                  onMergeWhole={() => mergeContinue(cluster.fragments)}
                 />
               ))}
             </div>
           )}
         </>
+      )}
+
+      {/* 合并续写浮条 */}
+      {selectMode && selectedIds.length > 0 && (
+        <div style={{
+          position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: 14, zIndex: 50,
+          background: 'var(--panel)', border: '1px solid var(--accent)', borderRadius: 999,
+          padding: '10px 20px', boxShadow: '0 14px 36px -18px rgba(0,0,0,0.6)',
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
+            已选 {selectedIds.length} 段{selectedIds.length >= MERGE_CAP ? '（已达上限）' : ''}
+          </span>
+          <button onClick={() => setSelectedIds([])} style={{
+            padding: '5px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+            border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)',
+          }}>清空</button>
+          <button onClick={handleMergeSelected} style={{
+            padding: '6px 16px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            border: '1px solid var(--accent)', background: 'var(--accent)', color: 'var(--on-accent)',
+          }}>合并续写 →</button>
+        </div>
       )}
     </div>
   )
@@ -373,7 +446,7 @@ function CategoryPill({ label, active, onClick, color }) {
   )
 }
 
-function FragmentCard({ fragment, onHide, onContinue, onRestore, hidden = false }) {
+function FragmentCard({ fragment, onHide, onContinue, onRestore, hidden = false, selectMode = false, selected = false, onToggleSelect }) {
   const primaryCat = fragment.categories[0]
   const cfg = primaryCat ? CAT_CONFIG[primaryCat] : { color: 'var(--text-hint)' }
   const score = fragment.quality_score || 0
@@ -382,13 +455,16 @@ function FragmentCard({ fragment, onHide, onContinue, onRestore, hidden = false 
   return (
     <div style={{
       background: hidden ? 'var(--panel2)' : 'var(--card-grad)',
-      border: '1px solid var(--border)', borderRadius: 12,
+      border: `1px solid ${selected ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 12,
       display: 'flex', overflow: 'hidden',
       opacity: hidden ? 0.85 : 1,
+      boxShadow: selected ? '0 0 0 1px var(--accent)' : 'none',
+      cursor: selectMode ? 'pointer' : 'default',
       transition: 'box-shadow 0.2s, transform 0.2s',
     }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 14px 30px -22px rgba(0,0,0,0.7)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}
+      onClick={selectMode ? () => onToggleSelect(fragment.id) : undefined}
+      onMouseEnter={e => { if (!selectMode) { e.currentTarget.style.boxShadow = '0 14px 30px -22px rgba(0,0,0,0.7)'; e.currentTarget.style.transform = 'translateY(-2px)' } }}
+      onMouseLeave={e => { if (!selectMode) { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' } }}
     >
       {/* 左侧色条 */}
       <div style={{ width: 4, background: hidden ? 'var(--text-hint)' : cfg.color, flexShrink: 0 }} />
@@ -450,6 +526,14 @@ function FragmentCard({ fragment, onHide, onContinue, onRestore, hidden = false 
           <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
             来自 {fragment.essay_date || '—'}{hidden ? ' · 已隐藏' : ''}
           </span>
+          {selectMode ? (
+            <span style={{
+              fontSize: 11, fontWeight: 600,
+              color: selected ? 'var(--accent)' : 'var(--text-hint)',
+            }}>
+              {selected ? '✓ 已选' : '点选'}
+            </span>
+          ) : (
           <div style={{ display: 'flex', gap: 6 }}>
             {hidden ? (
               <button
@@ -487,13 +571,14 @@ function FragmentCard({ fragment, onHide, onContinue, onRestore, hidden = false 
               </>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function ThemeClusterCard({ cluster, onContinue }) {
+function ThemeClusterCard({ cluster, onContinue, onMergeWhole }) {
   const [open, setOpen] = useState(true)
   return (
     <div style={{ background: 'var(--card-grad)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
@@ -518,6 +603,15 @@ function ThemeClusterCard({ cluster, onContinue }) {
           }}>
             {cluster.fragment_count} 个片段
           </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onMergeWhole() }}
+            style={{
+              fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, cursor: 'pointer',
+              border: '1px solid var(--accent)', background: 'var(--accent)', color: 'var(--on-accent)',
+            }}
+          >
+            用整组开一篇
+          </button>
           <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>{open ? '▲' : '▼'}</span>
         </div>
       </div>
