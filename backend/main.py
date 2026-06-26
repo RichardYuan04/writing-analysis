@@ -901,6 +901,26 @@ def assist_expand(data: AssistRequest):
     return _assist_call(data, user, max_tokens=_cap(data.text, 3, 512, 2048), parse_options=False, model="claude-sonnet-4-6")
 
 
+class ContinueRequest(BaseModel):
+    text: str
+    hints: list[str] = []
+    context: str = ""
+
+
+@app.post("/assist/continue")
+def assist_continue(data: ContinueRequest):
+    hints = [h.strip() for h in (data.hints or []) if h and h.strip()]
+    hint_line = ("\n可参考的发展方向（不必照搬、不必逐条覆盖）：" + "；".join(hints)) if hints else ""
+    user = (
+        "你是下面这段文字的作者本人，请接着已有的文字继续往下写。\n"
+        "要求：承接原文的语气、思路与情感，自然往下展开 2-4 句；"
+        "不要重复或改写已有内容，不要解释、不要加前缀，直接输出续写的部分。"
+        f"{hint_line}\n\n已有文字：{data.text.strip()}" + _ctx_line(data.context)
+    )
+    return _assist_call(data, user, max_tokens=_cap(data.text, 1.2, 400, 1024),
+                        parse_options=False, model="claude-sonnet-4-6")
+
+
 # ── 读者视角 ──
 # 选一个人格读者，读完整篇 → 回一封第一人称的信。读整篇、不依赖选区、不注入 SOUL。
 # 每个读者一张结构化「风格卡」（透镜/节奏/用词/手法/姿态/范例/禁忌），注入为其 system。

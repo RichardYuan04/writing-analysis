@@ -96,3 +96,35 @@ def test_cite_empty_results_returns_empty_options(client, mock_anthropic):
 def test_cite_rejects_empty_text(client, mock_anthropic):
     r = client.post("/assist/cite", json={"text": "  ", "context": ""})
     assert r.status_code == 400
+
+
+# ── /assist/continue：续写（注入 SOUL，把 hint 带进 user）──
+
+def test_continue_returns_result_and_uses_sonnet(client, mock_anthropic):
+    mock_anthropic.set_text("夜更深了，便利店的灯还亮着，像替谁守着一盏。")
+    r = client.post("/assist/continue", json={
+        "text": "我买了一瓶水，其实并不渴。", "hints": ["把'灯'这个意象再推一层"],
+    })
+    assert r.status_code == 200
+    assert r.json()["result"].startswith("夜更深了")
+    cap = mock_anthropic.captured
+    assert cap["model"] == "claude-sonnet-4-6"
+
+
+def test_continue_injects_soul_taboo_and_hint(client, mock_anthropic, db):
+    mock_anthropic.set_text("续写内容")
+    client.post("/assist/continue", json={
+        "text": "原文一句。", "hints": ["朝孤独的反面写"],
+    })
+    cap = mock_anthropic.captured
+    # 无 SOUL 时 system 回落 DEFAULT_TABOO（含「AI 腔」），证明走了 SOUL 注入路径
+    assert "AI 腔" in cap["system"]
+    # hint 与原文进了发给模型的 user 消息
+    user_msg = cap["messages"][0]["content"]
+    assert "朝孤独的反面写" in user_msg
+    assert "原文一句" in user_msg
+
+
+def test_continue_rejects_empty_text(client, mock_anthropic):
+    r = client.post("/assist/continue", json={"text": "  ", "hints": []})
+    assert r.status_code == 400
