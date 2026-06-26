@@ -58,6 +58,7 @@ export const getSentimentTimeline = (granularity, startDate, endDate) => {
 
 export const vaultStatus = () => api.get('/vault/status')
 export const vaultAnalyze = () => api.post('/vault/analyze')
+export const vaultAnalyzeStatus = () => api.get('/vault/analyze/status')
 export const listFragments = (category, hiddenOnly = false) => {
   const params = {}
   if (category) params.category = category

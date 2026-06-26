@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { vaultStatus, vaultAnalyze, listFragments, listThemes, updateFragmentFeedback } from '../api'
+import { vaultStatus, vaultAnalyze, vaultAnalyzeStatus, listFragments, listThemes, updateFragmentFeedback } from '../api'
 
 // 每个类别只保留语义色相 + emoji，背景/边框由色相经 color-mix 派生，明暗主题通用
 const CAT_CONFIG = {
@@ -21,6 +21,8 @@ export default function DraftVault({ onWrite }) {
   const [view, setView] = useState('cat')          // 'cat' | 'theme'
   const [activecat, setActiveCat] = useState(null) // null = 全部
   const [analyzing, setAnalyzing] = useState(false)
+  const [progress, setProgress] = useState(null)    // {done, total} 分析进度
+  const [failedInfo, setFailedInfo] = useState([])  // [{essay_id, error}] 失败明细
   const [showHidden, setShowHidden] = useState(false)   // 是否在「已隐藏」视图
   const [hiddenFragments, setHiddenFragments] = useState([])
   const [hiddenCat, setHiddenCat] = useState(null)      // 已隐藏视图的类别筛选
@@ -40,13 +42,31 @@ export default function DraftVault({ onWrite }) {
 
   useEffect(() => { loadAll() }, [loadAll])
 
+  const pollUntilDone = async () => {
+    // 轮询后台任务，直到 running 变 false；实时更新进度
+    for (;;) {
+      await new Promise(res => setTimeout(res, 1500))
+      let s
+      try { s = (await vaultAnalyzeStatus()).data } catch { break }
+      setProgress({ done: s.done, total: s.total })
+      if (!s.running) { setFailedInfo(s.failed || []); break }
+    }
+  }
+
   const handleAnalyze = async () => {
     setAnalyzing(true)
+    setFailedInfo([])
+    setProgress(null)
     try {
-      await vaultAnalyze()
+      const r = await vaultAnalyze()
+      if (r.data.started || r.data.running) {
+        setProgress({ done: r.data.done || 0, total: r.data.total || 0 })
+        await pollUntilDone()
+      }
       await loadAll()
     } finally {
       setAnalyzing(false)
+      setProgress(null)
     }
   }
 
@@ -140,7 +160,30 @@ export default function DraftVault({ onWrite }) {
             border: '2px solid var(--border)', borderTopColor: 'var(--accent)',
             animation: 'spin 0.8s linear infinite', flexShrink: 0,
           }} />
-          正在分析 {status.pending_essays} 篇新随笔，预计十余秒内完成……
+          {progress && progress.total > 0
+            ? `正在分析 ${progress.done}/${progress.total} 篇……（在后台进行，可离开本页）`
+            : '正在准备分析……'}
+        </div>
+      )}
+
+      {/* ── 失败明细（分析结束后，有失败才显示）── */}
+      {!analyzing && failedInfo.length > 0 && (
+        <div style={{
+          background: tint('#bd8aa2', 12), border: '1px solid var(--border)', borderRadius: 8,
+          padding: '10px 16px', marginBottom: 16, fontSize: 12, color: 'var(--text-secondary)',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
+        }}>
+          <div>
+            <span style={{ color: '#bd8aa2', fontWeight: 600 }}>{failedInfo.length} 篇分析失败</span>
+            ，已保留在「待分析」，可再点「分析新随笔」重试。
+            <div style={{ marginTop: 4, color: 'var(--text-hint)', lineHeight: 1.6 }}>
+              {failedInfo.slice(0, 3).map(f => `#${f.essay_id}：${(f.error || '').slice(0, 40)}`).join('；')}
+            </div>
+          </div>
+          <button onClick={() => setFailedInfo([])} style={{
+            flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-hint)',
+            cursor: 'pointer', fontSize: 14,
+          }}>✕</button>
         </div>
       )}
 

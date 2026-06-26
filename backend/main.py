@@ -12,6 +12,7 @@ import re
 import os
 import statistics
 import json
+import threading
 from dotenv import load_dotenv
 import anthropic
 import httpx
@@ -85,7 +86,12 @@ app.add_middleware(
 )
 
 # 数据库
-engine = create_engine(os.getenv("ESSAYS_DB_URL", "sqlite:///./essays.db"))
+_db_url = os.getenv("ESSAYS_DB_URL", "sqlite:///./essays.db")
+# SQLite 默认禁止跨线程复用连接；后台分析任务在独立线程跑，需放开（Postgres 不需要）
+engine = create_engine(
+    _db_url,
+    connect_args={"check_same_thread": False} if _db_url.startswith("sqlite") else {},
+)
 Base = declarative_base()
 
 class Essay(Base):
@@ -1730,6 +1736,8 @@ def classify_fragments(paragraphs: list) -> list:
 ]
 只返回JSON数组，不要其他文字。"""
 
+    # 失败一律抛出，交由调用方决定「保留待分析、下次重试」；
+    # 绝不吞成 []（那会和「真的没有有价值片段」混淆，导致随笔被错误标记为已分析）。
     try:
         raw = _deepseek_chat(
             "你是写作素材分析师。严格只返回 JSON 数组，不要任何解释或多余文字。",
@@ -1737,30 +1745,57 @@ def classify_fragments(paragraphs: list) -> list:
             max_tokens=6000,
             model=DEEPSEEK_VAULT_MODEL,
         )
-        # 去掉 markdown 代码块
-        raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
-        # 提取第一个 JSON 数组（防止前后有多余文字）
-        match = re.search(r"\[.*\]", raw, re.DOTALL)
-        if match:
-            raw = match.group(0)
-        return json.loads(raw)
     except Exception as e:
-        print(f"[vault] classify error: {e}")
-        return []
+        raise RuntimeError(f"classify 调用模型失败: {e}") from e
+    # 去掉 markdown 代码块
+    raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
+    # 提取第一个 JSON 数组（防止前后有多余文字）
+    match = re.search(r"\[.*\]", raw, re.DOTALL)
+    if match:
+        raw = match.group(0)
+    try:
+        data = json.loads(raw)
+    except Exception as e:
+        raise RuntimeError(f"classify 返回非法 JSON: {e}") from e
+    if not isinstance(data, list):
+        raise RuntimeError("classify 返回的不是 JSON 数组")
+    return data
 
 
 # ── 单篇随笔分析 ──
 
-def analyze_essay_fragments(essay_id: int):
+def _mark_extracted(essay_id: int):
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE essays SET fragments_extracted=1 WHERE id=:id"), {"id": essay_id})
+        conn.commit()
+
+
+def analyze_essay_fragments(essay_id: int) -> dict:
+    """分析单篇随笔，返回 {essay_id, ok, fragments, error}。
+
+    标记 fragments_extracted=1 的语义（修 #4）：
+    - 没段落（太短）→ 标记（没东西可分析，别永远 pending）。
+    - 分类成功（哪怕 0 个有价值片段）→ 入库 + 标记。
+    - 分类失败 / 算向量失败 → **不标记**，保留待下次重试。
+    """
     session = Session()
     try:
         essay = session.query(Essay).filter(Essay.id == essay_id).first()
         if not essay:
-            return
+            return {"essay_id": essay_id, "ok": False, "fragments": 0, "error": "essay 不存在"}
 
         paragraphs = split_paragraphs(essay.content)
-        classifications = classify_fragments(paragraphs) if paragraphs else []
+        if not paragraphs:
+            _mark_extracted(essay_id)
+            return {"essay_id": essay_id, "ok": True, "fragments": 0, "error": None}
 
+        try:
+            classifications = classify_fragments(paragraphs)
+        except Exception as e:
+            print(f"[vault] analyze_essay {essay_id} 分类失败（保留待分析）: {e}")
+            return {"essay_id": essay_id, "ok": False, "fragments": 0, "error": str(e)}
+
+        n = 0
         for item in classifications:
             if not item.get("is_valuable"):
                 continue
@@ -1783,14 +1818,15 @@ def analyze_essay_fragments(essay_id: int):
                 user_hidden=0,
             )
             session.add(fragment)
+            n += 1
 
         session.commit()
-        with engine.connect() as conn:
-            conn.execute(text("UPDATE essays SET fragments_extracted=1 WHERE id=:id"), {"id": essay_id})
-            conn.commit()
+        _mark_extracted(essay_id)
+        return {"essay_id": essay_id, "ok": True, "fragments": n, "error": None}
     except Exception as e:
-        print(f"[vault] analyze_essay {essay_id} error: {e}")
+        print(f"[vault] analyze_essay {essay_id} error（保留待分析）: {e}")
         session.rollback()
+        return {"essay_id": essay_id, "ok": False, "fragments": 0, "error": str(e)}
     finally:
         session.close()
 
@@ -1882,21 +1918,72 @@ def vault_status():
         session.close()
 
 
-@app.post("/vault/analyze")
-def vault_analyze():
+# ── 后台分析任务（修 #8：不再一个请求闷头同步跑几分钟）──
+
+_vault_job = {
+    "running": False, "total": 0, "done": 0,
+    "failed": [], "started_at": None, "finished_at": None,
+}
+_vault_job_lock = threading.Lock()
+
+
+def _pending_essay_ids() -> list:
     with engine.connect() as conn:
         rows = conn.execute(
             text("SELECT id FROM essays WHERE fragments_extracted = 0 OR fragments_extracted IS NULL")
         ).fetchall()
-    essay_ids = [row[0] for row in rows]
+    return [r[0] for r in rows]
 
-    for essay_id in essay_ids:
-        analyze_essay_fragments(essay_id)
 
-    if essay_ids:
-        recluster_themes()
+def _run_vault_job(essay_ids: list):
+    """后台线程：逐篇分析，实时更新进度与失败明细，最后重聚类。"""
+    try:
+        for eid in essay_ids:
+            res = analyze_essay_fragments(eid)
+            with _vault_job_lock:
+                _vault_job["done"] += 1
+                if not res["ok"]:
+                    _vault_job["failed"].append({"essay_id": eid, "error": res["error"]})
+        if essay_ids:
+            recluster_themes()
+    finally:
+        with _vault_job_lock:
+            _vault_job["running"] = False
+            _vault_job["finished_at"] = datetime.now().isoformat()
 
-    return {"analyzed": len(essay_ids)}
+
+@app.post("/vault/analyze")
+def vault_analyze():
+    """立即返回；真正的分析在后台线程跑。重复调用返回当前进度，不重复启动。"""
+    with _vault_job_lock:
+        if _vault_job["running"]:
+            return {"started": False, "running": True,
+                    "total": _vault_job["total"], "done": _vault_job["done"]}
+        essay_ids = _pending_essay_ids()
+        _vault_job.update(running=bool(essay_ids), total=len(essay_ids), done=0, failed=[],
+                          started_at=datetime.now().isoformat(), finished_at=None)
+        if not essay_ids:
+            return {"started": False, "running": False, "total": 0, "done": 0}
+        threading.Thread(target=_run_vault_job, args=(essay_ids,), daemon=True).start()
+        return {"started": True, "running": True, "total": len(essay_ids), "done": 0}
+
+
+@app.get("/vault/analyze/status")
+def vault_analyze_status():
+    with _vault_job_lock:
+        return dict(_vault_job)
+
+
+@app.on_event("startup")
+def _warmup_embedding_model():
+    """开机就在后台线程预热 embedding 模型，把首次加载延迟从用户点击那一刻挪走。"""
+    def _load():
+        try:
+            get_embedding_model()
+            print("[vault] embedding 模型预热完成")
+        except Exception as e:
+            print(f"[vault] embedding 预热失败: {e}")
+    threading.Thread(target=_load, daemon=True).start()
 
 
 @app.get("/vault/fragments")
