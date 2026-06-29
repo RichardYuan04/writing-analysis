@@ -1216,6 +1216,22 @@
 }
 .seal-ic svg { width: 18px; height: 18px; }
 
+/* 词性分布环形图 */
+.pos-donut-wrap { display: flex; align-items: center; gap: 28px; padding: 8px 4px; }
+.pos-donut { position: relative; flex-shrink: 0; width: 140px; height: 140px; }
+.pos-donut svg circle { transition: stroke-dasharray 0.5s ease; }
+.pos-donut-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none;
+}
+.pos-dom-name { font-family: var(--font-serif); font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.pos-dom-pct { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+.pos-legend { display: flex; flex-direction: column; gap: 10px; }
+.pos-legend-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.pos-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.pos-legend-name { color: var(--text-secondary); min-width: 44px; }
+.pos-legend-pct { font-family: var(--font-display); font-weight: 700; color: var(--text-primary); }
+
 /* 半成品续写提示横幅 */
 .vault-hint-banner {
   display: flex; align-items: center; gap: 12px;

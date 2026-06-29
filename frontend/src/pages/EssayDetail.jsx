@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { getEssay, deleteEssay, updateEssay } from '../api'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import WordCloud from '../components/WordCloud'
 import MoodCard from '../components/MoodCard'
 import RichEditor from '../components/RichEditor'
@@ -69,7 +68,9 @@ export default function EssayDetail({ id, onBack }) {
     return '😐 平静'
   }
 
-  const posData = Object.entries(essay.pos_distribution || {}).map(([k, v]) => ({ name: k, count: v }))
+  const posData = POS_ORDER
+    .filter(k => essay.pos_distribution?.[k])
+    .map(k => ({ name: k, count: essay.pos_distribution[k], color: POS_COLORS[k] }))
 
   return (
     <div className="detail">
@@ -150,14 +151,7 @@ export default function EssayDetail({ id, onBack }) {
             {posData.length > 0 && (
               <section className="section">
                 <h2>词性分布</h2>
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={posData}>
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <PosDonut data={posData} />
               </section>
             )}
 
@@ -178,6 +172,59 @@ export default function EssayDetail({ id, onBack }) {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// 词性：固定展示顺序 + 各自语义色（取自全站调色板，明暗主题通用）
+const POS_ORDER = ['名词', '动词', '形容词']
+const POS_COLORS = { 名词: '#8aa0bc', 动词: '#9aab78', 形容词: '#d6a468' }
+
+// 自定义 SVG 环形图：按占比分段着色，中心点出主导词性，右侧图例列三项百分比
+function PosDonut({ data }) {
+  const total = data.reduce((s, d) => s + d.count, 0) || 1
+  const pct = (n) => Math.round((n / total) * 100)
+  const dominant = data.reduce((a, b) => (b.count > a.count ? b : a), data[0])
+
+  const R = 54, STROKE = 20, C = 2 * Math.PI * R
+  let acc = 0   // 累计占比，用于排布各段起点
+
+  return (
+    <div className="pos-donut-wrap">
+      <div className="pos-donut">
+        <svg viewBox="0 0 140 140" width="140" height="140" aria-hidden="true">
+          <circle cx="70" cy="70" r={R} fill="none" stroke="var(--border-soft)" strokeWidth={STROKE} opacity="0.5" />
+          <g transform="rotate(-90 70 70)">
+            {data.map((d) => {
+              const frac = d.count / total
+              const seg = (
+                <circle
+                  key={d.name}
+                  cx="70" cy="70" r={R} fill="none"
+                  stroke={d.color} strokeWidth={STROKE} strokeLinecap="butt"
+                  strokeDasharray={`${frac * C} ${C - frac * C}`}
+                  strokeDashoffset={-acc * C}
+                />
+              )
+              acc += frac
+              return seg
+            })}
+          </g>
+        </svg>
+        <div className="pos-donut-center">
+          <div className="pos-dom-name">{dominant.name}</div>
+          <div className="pos-dom-pct">{pct(dominant.count)}%</div>
+        </div>
+      </div>
+      <div className="pos-legend">
+        {data.map((d) => (
+          <div key={d.name} className="pos-legend-row">
+            <span className="pos-dot" style={{ background: d.color }} />
+            <span className="pos-legend-name">{d.name}</span>
+            <span className="pos-legend-pct">{pct(d.count)}%</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
