@@ -325,12 +325,18 @@ def analyze_text(content: str):
     sentences = [s.strip() for s in sentences if len(s.strip()) > 5]
     pos_counts = Counter()
     for word, flag in pseg.cut(content):
+        if not word.strip():
+            continue
+        if flag.startswith('x') or flag.startswith('w'):   # 标点/符号不计入词性
+            continue
         if flag.startswith('n'):
             pos_counts['名词'] += 1
         elif flag.startswith('v'):
             pos_counts['动词'] += 1
         elif flag.startswith('a'):
             pos_counts['形容词'] += 1
+        else:                                              # 副词/连词/代词/助词/数词等
+            pos_counts['其他'] += 1
     return {
         "word_count": word_count,
         "top_words": top_words,

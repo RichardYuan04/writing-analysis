@@ -184,14 +184,18 @@ export default function EssayDetail({ id, onBack }) {
 }
 
 // 词性：固定展示顺序 + 各自语义色（取自全站调色板，明暗主题通用）
-const POS_ORDER = ['名词', '动词', '形容词']
-const POS_COLORS = { 名词: '#8aa0bc', 动词: '#9aab78', 形容词: '#d6a468' }
+// 「其他」= 副词/连词/代词/助词/数词等，用中性灰，让三类实词更醒目
+const POS_ORDER = ['名词', '动词', '形容词', '其他']
+const POS_COLORS = { 名词: '#8aa0bc', 动词: '#9aab78', 形容词: '#d6a468', 其他: '#c2bcc8' }
+const POS_CONTENT = ['名词', '动词', '形容词']   // 实词：中心主导词只在这三类里选
 
 // 自定义 SVG 环形图：按占比分段着色，中心点出主导词性，右侧图例列三项百分比
 function PosDonut({ data }) {
   const total = data.reduce((s, d) => s + d.count, 0) || 1
   const pct = (n) => Math.round((n / total) * 100)
-  const dominant = data.reduce((a, b) => (b.count > a.count ? b : a), data[0])
+  // 中心点出主导「实词」（名/动/形里占比最高的），不让「其他」抢焦点
+  const contentData = data.filter(d => POS_CONTENT.includes(d.name))
+  const dominant = (contentData.length ? contentData : data).reduce((a, b) => (b.count > a.count ? b : a))
 
   const R = 54, STROKE = 20, C = 2 * Math.PI * R
   let acc = 0   // 累计占比，用于排布各段起点
