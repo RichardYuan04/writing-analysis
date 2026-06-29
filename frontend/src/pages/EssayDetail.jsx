@@ -148,29 +148,34 @@ export default function EssayDetail({ id, onBack }) {
               <WordCloud words={essay.top_words} />
             </section>
 
-            <div className="detail-pair">
-              {posData.length > 0 && (
+            <div className="detail-cols">
+              {/* 左列：词性分布（矮）+ 情绪分布（中），叠起来与右列等高 */}
+              <div className="detail-col">
+                {posData.length > 0 && (
+                  <section className="section">
+                    <h2>词性分布</h2>
+                    <PosDonut data={posData} />
+                  </section>
+                )}
+                {essay.emotion_detail && <EmotionBreakdown detail={essay.emotion_detail} />}
+              </div>
+
+              {/* 右列：高频词 Top 10（满十行） */}
+              <div className="detail-col">
                 <section className="section">
-                  <h2>词性分布</h2>
-                  <PosDonut data={posData} />
+                  <h2>高频词 Top 10</h2>
+                  <div className="top-words">
+                    {essay.top_words?.slice(0, 10).map((w, i) => (
+                      <div key={w.word} className="top-word-item">
+                        <span className="rank">#{i + 1}</span>
+                        <span className="word">{w.word}</span>
+                        <span className="count">{w.count} 次</span>
+                      </div>
+                    ))}
+                  </div>
                 </section>
-              )}
-
-              <section className="section">
-                <h2>高频词 Top 10</h2>
-                <div className="top-words">
-                  {essay.top_words?.slice(0, 10).map((w, i) => (
-                    <div key={w.word} className="top-word-item">
-                      <span className="rank">#{i + 1}</span>
-                      <span className="word">{w.word}</span>
-                      <span className="count">{w.count} 次</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
+              </div>
             </div>
-
-            {essay.emotion_detail && <EmotionBreakdown detail={essay.emotion_detail} />}
           </div>
         </>
       )}
