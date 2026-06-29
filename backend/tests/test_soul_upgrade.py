@@ -9,6 +9,25 @@ def _seed_profile(content="克制短句。", taboo=None, golden=None):
     s.add(row); s.commit(); s.close()
 
 
+class _E:
+    """最小 Essay 替身，_golden_samples 只读 .content。"""
+    def __init__(self, content):
+        self.content = content
+
+
+def test_golden_samples_skips_short_opening_line():
+    # 第一行是地名短行「瘦西湖」，应跳过，取下一段够长的句子
+    essays = [_E("瘦西湖\n那天傍晚我沿着长堤走，水面把晚霞揉成了碎金，风一过就散了。")]
+    out = main._golden_samples(essays, n=3)
+    assert out and not out[0].startswith("瘦西湖")
+    assert "晚霞" in out[0]
+
+
+def test_golden_samples_essay_with_only_short_lines_contributes_nothing():
+    essays = [_E("瘦西湖\n清晨\n雨")]   # 全是标题式短行，没有可作语感参照的句子
+    assert main._golden_samples(essays, n=3) == []
+
+
 def test_get_taboo_falls_back_to_default(client, db):
     _seed_profile(taboo=None)
     g = client.get("/style-profile").json()

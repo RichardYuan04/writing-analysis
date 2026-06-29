@@ -673,8 +673,10 @@ def _sample_excerpts(essays, per_essay_cap: int = 400, total_cap: int = 800) -> 
     return "\n\n".join(parts)
 
 
-def _golden_samples(essays, n: int = 3, cap: int = 200) -> list:
-    """抽 n 段代表性原文（每篇取第一段，保留断句），每段 ≤cap 字。"""
+def _golden_samples(essays, n: int = 3, cap: int = 200, floor: int = 16) -> list:
+    """抽 n 段代表性原文作语感参照：每篇取第一段「够长」的文字
+    （≥floor 字，跳过标题/地名一类的短行），保留断句，每段 ≤cap 字。
+    没有够长句子的随笔不贡献样例。"""
     out = []
     for e in essays:
         if len(out) >= n:
@@ -682,7 +684,8 @@ def _golden_samples(essays, n: int = 3, cap: int = 200) -> list:
         content = (e.content or "").strip()
         if not content:
             continue
-        para = next((p.strip() for p in re.split(r"\n\s*\n|\n", content) if p.strip()), "")
+        paras = [p.strip() for p in re.split(r"\n\s*\n|\n", content) if p.strip()]
+        para = next((p for p in paras if len(p) >= floor), "")
         if not para:
             continue
         out.append(para[:cap] + "…" if len(para) > cap else para)
