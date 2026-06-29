@@ -59,6 +59,13 @@ const GLYPHS = {
       <line x1="12" y1="6.5" x2="12" y2="18" />
     </>
   ),
+  // 搜索：放大镜
+  search: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6" />
+      <line x1="15" y1="15" x2="20" y2="20" />
+    </>
+  ),
 }
 
 export default function Icon({ name, className = '' }) {
@@ -69,6 +76,37 @@ export default function Icon({ name, className = '' }) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
            strokeLinecap="round" strokeLinejoin="round">
         {glyph}
+      </svg>
+    </span>
+  )
+}
+
+// 单字印章字徽：同一方印面里放一个汉字（与 诗/叙/哲 字徽同源），
+// 用于写作画像「风格解读」等以一个字概括维度的场景。
+export function SealChar({ char, className = '' }) {
+  return (
+    <span className={`seal-ic ${className}`}>
+      <b className="seal-ch">{char}</b>
+    </span>
+  )
+}
+
+// 情绪线性脸：圆脸版。三种表情统一用主题色（currentColor=accent），
+// 不按情绪分色——靠嘴角区分积极/平静/消极。mood ∈ positive | neutral | negative
+const FACE_MOUTH = {
+  positive: <path d="M8.4 13.8 Q12 16.8 15.6 13.8" />,
+  neutral: <line x1="8.8" y1="14.6" x2="15.2" y2="14.6" />,
+  negative: <path d="M8.4 15.4 Q12 12.4 15.6 15.4" />,
+}
+export function Face({ mood = 'neutral', className = '' }) {
+  return (
+    <span className={`mood-face ${className}`}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
+           strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="8.6" />
+        <circle cx="9.2" cy="10.2" r="0.95" fill="currentColor" stroke="none" />
+        <circle cx="14.8" cy="10.2" r="0.95" fill="currentColor" stroke="none" />
+        {FACE_MOUTH[mood] || FACE_MOUTH.neutral}
       </svg>
     </span>
   )

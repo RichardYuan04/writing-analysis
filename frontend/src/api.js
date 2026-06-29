@@ -24,12 +24,15 @@ export const assistMetaphor = (data) => api.post('/assist/metaphor', data)
 export const assistExpand = (data) => api.post('/assist/expand', data)
 export const assistReader = (data) => api.post('/assist/reader', data)
 export const assistCite = (data) => api.post('/assist/cite', data)
+export const assistContinue = (data) => api.post('/assist/continue', data)
+export const saveEssayLetter = (id, data) => api.post(`/essays/${id}/letters`, data)
+export const deleteEssayLetter = (id, letterId) => api.delete(`/essays/${id}/letters/${letterId}`)
 export const getPortrait = () => api.get('/stats/portrait')
 export const deepAnalysis = () => api.post('/stats/deep-analysis')
 
 export const getStyleProfile = () => api.get('/style-profile')
 export const generateStyleProfile = (essayIds) => api.post('/style-profile/generate', { essay_ids: essayIds })
-export const saveStyleProfile = (content) => api.put('/style-profile', { content })
+export const saveStyleProfile = (data) => api.put('/style-profile', data)
 
 export const getOverview = (startDate, endDate) => {
   const params = {}
@@ -56,6 +59,7 @@ export const getSentimentTimeline = (granularity, startDate, endDate) => {
 
 export const vaultStatus = () => api.get('/vault/status')
 export const vaultAnalyze = () => api.post('/vault/analyze')
+export const vaultAnalyzeStatus = () => api.get('/vault/analyze/status')
 export const listFragments = (category, hiddenOnly = false) => {
   const params = {}
   if (category) params.category = category

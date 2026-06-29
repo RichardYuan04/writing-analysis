@@ -12,6 +12,7 @@ import re
 import os
 import statistics
 import json
+import threading
 from dotenv import load_dotenv
 import anthropic
 import httpx
@@ -42,16 +43,18 @@ anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 gemini_client = google_genai.Client(api_key=gemini_api_key) if gemini_api_key else None
 
-# DeepSeek（OpenAI 兼容接口），目前仅用于「读者视角」。配置全走 .env。
+# DeepSeek（OpenAI 兼容接口），用于读者视角 / 半成品仓库提炼 / 写作页续写。配置全走 .env。
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+# 半成品仓库（分类/主题命名）专用模型：默认回落主模型，可在 .env 单独设更便宜的非推理档
+DEEPSEEK_VAULT_MODEL = os.getenv("DEEPSEEK_VAULT_MODEL", DEEPSEEK_MODEL)
 
 
-def _deepseek_chat(system: str, user: str, max_tokens: int) -> str:
+def _deepseek_chat(system: str, user: str, max_tokens: int, model: str | None = None) -> str:
     """调 DeepSeek chat/completions（OpenAI 兼容），返回正式回复文本。
     deepseek-v4-pro 是推理模型：reasoning_content 丢弃，只取 content；
-    故 max_tokens 要给足（推理 token + 正文）。"""
+    故 max_tokens 要给足（推理 token + 正文）。model 缺省走主模型 DEEPSEEK_MODEL。"""
     if not DEEPSEEK_API_KEY:
         raise RuntimeError("DEEPSEEK_API_KEY 未配置")
     resp = httpx.post(
@@ -59,7 +62,7 @@ def _deepseek_chat(system: str, user: str, max_tokens: int) -> str:
         headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                  "Content-Type": "application/json"},
         json={
-            "model": DEEPSEEK_MODEL,
+            "model": model or DEEPSEEK_MODEL,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -83,7 +86,12 @@ app.add_middleware(
 )
 
 # 数据库
-engine = create_engine(os.getenv("ESSAYS_DB_URL", "sqlite:///./essays.db"))
+_db_url = os.getenv("ESSAYS_DB_URL", "sqlite:///./essays.db")
+# SQLite 默认禁止跨线程复用连接；后台分析任务在独立线程跑，需放开（Postgres 不需要）
+engine = create_engine(
+    _db_url,
+    connect_args={"check_same_thread": False} if _db_url.startswith("sqlite") else {},
+)
 Base = declarative_base()
 
 class Essay(Base):
@@ -100,6 +108,7 @@ class Essay(Base):
     emotion_detail = Column(Text)   # JSON: {joy, gratitude, love, neutral, surprise, anger, ...}
     mood_card = Column(Text)        # JSON: {tone, tone_emoji, keywords[], ai_reply, ai_reply_status, generated_at}
     content_rich = Column(Text)     # JSON: BlockNote 块文档（富文本）；content 仍存纯文本供分析/搜索
+    letters = Column(Text)          # JSON 数组：读者来信，每封 {id,persona,persona_name,content,created_at}
     created_at = Column(DateTime, default=datetime.now)
 
 
@@ -111,6 +120,8 @@ class StyleProfile(Base):
     source_essay_ids = Column(Text)              # JSON 数组：本次养成用了哪几篇
     generated_at = Column(DateTime, default=datetime.now)
     user_edited = Column(Integer, default=0)     # 0/1
+    golden_samples = Column(Text)   # JSON 数组：养成时抽的 2–3 段黄金样例原文
+    taboo = Column(Text)            # 可编辑禁止项；空则回落 DEFAULT_TABOO
 
 
 class Draft(Base):
@@ -119,6 +130,7 @@ class Draft(Base):
     title = Column(String(200))
     content = Column(Text)
     content_rich = Column(Text)                   # JSON: BlockNote 块文档
+    letters = Column(Text)          # JSON 数组：随稿子流转的读者来信
     date = Column(String(10))                    # YYYY-MM-DD（用户设定的写作日期）
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now)
@@ -164,6 +176,26 @@ def setup_fts():
 setup_fts()
 
 
+MAX_LETTERS = 5
+
+
+def _parse_letters(raw) -> list:
+    try:
+        v = json.loads(raw) if raw else []
+        return v if isinstance(v, list) else []
+    except Exception:
+        return []
+
+
+def _dump_letters(items) -> str:
+    return json.dumps((items or [])[:MAX_LETTERS], ensure_ascii=False)
+
+
+def _gen_letter_id() -> str:
+    import uuid
+    return "lt_" + uuid.uuid4().hex[:10]
+
+
 def migrate_db():
     """为旧表补加新列（幂等）"""
     with engine.connect() as conn:
@@ -174,6 +206,7 @@ def migrate_db():
             ("emotion_detail",     "TEXT"),
             ("mood_card",          "TEXT"),
             ("content_rich",       "TEXT"),
+            ("letters",            "TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE essays ADD COLUMN {col} {typ}"))
@@ -186,6 +219,19 @@ def migrate_db():
             conn.commit()
         except Exception:
             pass  # 列已存在
+        try:
+            conn.execute(text("ALTER TABLE drafts ADD COLUMN letters TEXT"))
+            conn.commit()
+        except Exception:
+            pass  # 列已存在
+
+        # style_profile 表补列（SOUL 升级：黄金样例 + 可编辑禁止项）
+        for col in ("golden_samples", "taboo"):
+            try:
+                conn.execute(text(f"ALTER TABLE style_profile ADD COLUMN {col} TEXT"))
+                conn.commit()
+            except Exception:
+                pass
 
 
 def compute_emotion_breakdown(content: str):
@@ -279,12 +325,22 @@ def analyze_text(content: str):
     sentences = [s.strip() for s in sentences if len(s.strip()) > 5]
     pos_counts = Counter()
     for word, flag in pseg.cut(content):
+        if not word.strip():
+            continue
+        if flag.startswith('x') or flag.startswith('w'):   # 标点/符号不计入词性
+            continue
         if flag.startswith('n'):
             pos_counts['名词'] += 1
         elif flag.startswith('v'):
             pos_counts['动词'] += 1
         elif flag.startswith('a'):
             pos_counts['形容词'] += 1
+        elif flag.startswith('d'):
+            pos_counts['副词'] += 1
+        elif flag.startswith('r'):
+            pos_counts['代词'] += 1
+        else:                                              # 连词/介词/助词/数词/量词等
+            pos_counts['其他'] += 1
     return {
         "word_count": word_count,
         "top_words": top_words,
@@ -334,10 +390,13 @@ class EssayCreate(BaseModel):
     content: str
     date: str
     content_rich: str | None = None
+    letters: list | None = None
 
 
 @app.post("/essays")
 def create_essay(data: EssayCreate):
+    if data.letters and len(data.letters) > MAX_LETTERS:
+        raise HTTPException(status_code=400, detail="读者信箱最多 5 封")
     analysis = analyze_text(data.content)
     em = compute_emotion_breakdown(data.content) or {}
     mood = compute_mood_card(data.content, em=em, analysis=analysis)
@@ -354,6 +413,7 @@ def create_essay(data: EssayCreate):
         sentiment_negative=em.get("negative"),
         emotion_detail=json.dumps(em["detail"]) if em.get("detail") else None,
         mood_card=json.dumps(mood, ensure_ascii=False),
+        letters=_dump_letters(data.letters or []),
     )
     session.add(essay)
     session.commit()
@@ -468,10 +528,55 @@ def get_essay(essay_id: int):
         "sentiment": essay.sentiment_score,
         "emotion_detail": json.loads(essay.emotion_detail) if essay.emotion_detail else None,
         "mood_card": json.loads(essay.mood_card) if essay.mood_card else None,
+        "letters": _parse_letters(essay.letters),
         **analysis,
     }
     session.close()
     return result
+
+
+class LetterIn(BaseModel):
+    persona: str
+    persona_name: str = ""
+    content: str
+
+
+@app.post("/essays/{essay_id}/letters")
+def add_essay_letter(essay_id: int, data: LetterIn):
+    session = Session()
+    essay = session.query(Essay).filter(Essay.id == essay_id).first()
+    if not essay:
+        session.close()
+        raise HTTPException(status_code=404, detail="Not found")
+    letters = _parse_letters(essay.letters)
+    if len(letters) >= MAX_LETTERS:
+        session.close()
+        raise HTTPException(status_code=400, detail="读者信箱已满，最多 5 封")
+    letters.append({
+        "id": _gen_letter_id(),
+        "persona": data.persona,
+        "persona_name": data.persona_name,
+        "content": data.content,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    })
+    essay.letters = _dump_letters(letters)
+    session.commit()
+    session.close()
+    return letters
+
+
+@app.delete("/essays/{essay_id}/letters/{letter_id}")
+def delete_essay_letter(essay_id: int, letter_id: str):
+    session = Session()
+    essay = session.query(Essay).filter(Essay.id == essay_id).first()
+    if not essay:
+        session.close()
+        raise HTTPException(status_code=404, detail="Not found")
+    letters = [lt for lt in _parse_letters(essay.letters) if lt.get("id") != letter_id]
+    essay.letters = _dump_letters(letters)
+    session.commit()
+    session.close()
+    return letters
 
 
 class EssayUpdate(BaseModel):
@@ -578,6 +683,33 @@ def _sample_excerpts(essays, per_essay_cap: int = 400, total_cap: int = 800) -> 
     return "\n\n".join(parts)
 
 
+def _golden_samples(essays, n: int = 3, cap: int = 200, floor: int = 16) -> list:
+    """抽 n 段代表性原文作语感参照：每篇取第一段「够长」的文字
+    （≥floor 字，跳过标题/地名一类的短行），保留断句，每段 ≤cap 字。
+    没有够长句子的随笔不贡献样例。"""
+    out = []
+    for e in essays:
+        if len(out) >= n:
+            break
+        content = (e.content or "").strip()
+        if not content:
+            continue
+        paras = [p.strip() for p in re.split(r"\n\s*\n|\n", content) if p.strip()]
+        para = next((p for p in paras if len(p) >= floor), "")
+        if not para:
+            continue
+        out.append(para[:cap] + "…" if len(para) > cap else para)
+    return out
+
+
+def _parse_or_empty(raw) -> list:
+    try:
+        v = json.loads(raw) if raw else []
+        return v if isinstance(v, list) else []
+    except Exception:
+        return []
+
+
 _SOUL_LABELS = [("节奏", "rhythm"), ("意象", "imagery"), ("情绪", "emotion"),
                 ("用词", "diction"), ("手法", "signature")]
 
@@ -625,14 +757,47 @@ class AssistRequest(BaseModel):
     style_profile: str = ""
 
 
-def _assist_system(style_profile: str) -> str:
-    sp = (style_profile or "").strip()
-    if sp:
-        style_line = (f"该作者的写作风格为：{sp}。"
+def _assist_system(bundle: dict) -> str:
+    content = (bundle.get("content") or "").strip()
+    taboo = (bundle.get("taboo") or DEFAULT_TABOO).strip()
+    samples = bundle.get("samples") or []
+    if content:
+        style_line = (f"该作者的写作风格为：{content}。"
                       "所有建议必须与该风格保持一致，不要改变作者的声音和语气。")
     else:
         style_line = "保持与原文及上下文一致的语气和风格，不要改变作者的声音。"
-    return f"你是写作助手。{style_line}\n直接输出建议内容，不要解释、不要加前缀。"
+    parts = [f"你是写作助手。{style_line}", taboo]
+    if samples:
+        parts.append("参考该作者的原文片段，学其语感、不要照抄内容：\n" + "\n---\n".join(samples))
+    parts.append("直接输出建议内容，不要解释、不要加前缀。")
+    return "\n".join(parts)
+
+
+DEFAULT_TABOO = (
+    "请规避以下「AI 腔」写法：\n"
+    "- 套话与软化词：值得注意的是 / 综上所述·总而言之 / 某种程度上·可能地 / 此外 / 「不是 X，而是 Y」「不仅…而是…」。\n"
+    "- 拔高与升华：「标志着…关键时刻」「象征着…」「反映了更广泛的趋势」；别用动名词堆抽象深刻。\n"
+    "- 空泛/促销词：至关重要、格局（抽象用）、展现、充满活力、令人叹为观止、迷人的。\n"
+    "- 句法节律：别三项排比成瘾（改两项或四项）；别连续等长句；破折号别当节奏拐杖。\n"
+    "- 对读者：别解释自己的比喻；别过度软化（「可能会产生影响」→「影响了」）；别绕开「是/有」。\n"
+    "- 结构：别每段都用整齐总结收尾；别强行在结尾升华或喊口号。"
+)
+
+
+def _load_soul_bundle() -> dict:
+    """读 SOUL 正文 + 禁止项 + 黄金样例。禁止项为空回落 DEFAULT_TABOO。"""
+    session = Session()
+    try:
+        row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+        if not row:
+            return {"content": "", "taboo": DEFAULT_TABOO, "samples": []}
+        return {
+            "content": (row.content or "").strip(),
+            "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
+            "samples": _parse_or_empty(row.golden_samples),
+        }
+    finally:
+        session.close()
 
 
 def _load_soul_content() -> str:
@@ -666,7 +831,7 @@ def _assist_call(data: AssistRequest, user: str, max_tokens: int, parse_options:
     if not text:
         raise HTTPException(status_code=400, detail="选中文字不能为空")
     # system 为 None 时默认注入 SOUL；显式传入（如比喻）则用传入的，不注入 SOUL
-    sys_prompt = system if system is not None else _assist_system(_load_soul_content())
+    sys_prompt = system if system is not None else _assist_system(_load_soul_bundle())
     try:
         message = anthropic_client.messages.create(
             model=model,
@@ -749,50 +914,120 @@ def assist_expand(data: AssistRequest):
     return _assist_call(data, user, max_tokens=_cap(data.text, 3, 512, 2048), parse_options=False, model="claude-sonnet-4-6")
 
 
+class ContinueRequest(BaseModel):
+    text: str
+    hints: list[str] = []
+    context: str = ""
+
+
+@app.post("/assist/continue")
+def assist_continue(data: ContinueRequest):
+    text = (data.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="续写内容不能为空")
+    hints = [h.strip() for h in (data.hints or []) if h and h.strip()]
+    hint_line = ("\n可参考的发展方向（不必照搬、不必逐条覆盖）：" + "；".join(hints)) if hints else ""
+    # 续写走 DeepSeek 默认模型；SOUL 正文/禁止项/黄金样例手动注入进 system
+    system = _assist_system(_load_soul_bundle())
+    user = (
+        "你是下面这段文字的作者本人，请接着已有的文字继续往下写。\n"
+        "要求：承接原文的语气、思路与情感，自然往下展开 2-4 句；"
+        "不要重复或改写已有内容，不要解释、不要加前缀，直接输出续写的部分。"
+        f"{hint_line}\n\n已有文字：{text}" + _ctx_line(data.context)
+    )
+    try:
+        # 推理模型，max_tokens 给足以容纳推理 + 续写
+        raw = _deepseek_chat(system, user, max_tokens=4000)
+        return {"result": raw.strip('「」""\'').strip()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[continue] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+
+
 # ── 读者视角 ──
 # 选一个人格读者，读完整篇 → 回一封第一人称的信。读整篇、不依赖选区、不注入 SOUL。
+# 每个读者一张结构化「风格卡」（透镜/节奏/用词/手法/姿态/范例/禁忌），注入为其 system。
+# 范例是 few-shot 锚点，可直接在此手动改写覆盖。
 READER_PERSONAS = {
     "poet": {
         "name": "诗人",
         "system": (
-            "你是一位诗人。读一篇文章时，你只在意意象、节奏和语言的质地——"
-            "哪一句的画面让你停住，哪里的词太顺、像借来的，哪里的节奏泄了气。"
+            "你是一位诗人。\n"
+            "【透镜】意象、节奏、用词——哪一句的画面让你停住，哪里的词太顺、像现成的套话。\n"
+            "【节奏】句子偏短，多停顿；爱用一个意象顶住整段，再让它沉一拍。\n"
+            "【用词】具体、感官、克制。\n"
+            "【手法】挑出一两处你觉得写得最准的词或画面，具体说准在哪——是某个字用得意外，还是两样东西摆在一起让人一愣；哪处是滑过去的现成话，就点名那几个字；若通篇都干净利落，就直说哪儿好，不为凑平衡硬贬一句。\n"
+            "【姿态】低声、贴近，像在耳边说话；夸得节制，拦得也轻。\n"
+            "【范例】「『湖岸的杨柳散开了发髻，任由发丝抚弄着水面』——好在『发髻』这个比方，柳枝就是散开的头发，岸边一下就有了具体的样子。可同篇里『西湖显得更加性感，那种张力浸透过千年的浪漫』就太满，是现成的漂亮话，把前面那点干净劲压住了。」\n"
+            "【禁忌】不堆华丽辞藻；不空谈「诗意/美感」，必须落到具体那一句。"
         ),
     },
     "novelist": {
         "name": "小说家",
         "system": (
-            "你是一位小说家。读一篇文章时，你只在意人物、场景与细节——"
-            "作者是把它「演」出来了，还是在「讲」；现场是否立住，有没有一张脸、一个动作。"
+            "你是一位小说家。\n"
+            "【透镜】人物、场景、细节——你是给了具体的人和事，还是直接把感受和道理说了出来。\n"
+            "【节奏】随场景走，叙述句为主；该慢的地方放慢，给动作和表情留位。\n"
+            "【用词】具体、有画面；偏爱描写，警惕大段概括和凌空的总结。\n"
+            "【手法】看作者是直接把感受或道理说了出来（像『我很孤独』『人还是不要自作多情的好』），还是给了具体的人和事让你自己感觉到。直接说出来的地方，问他当时发生了什么、谁做了什么、有什么细节；已经写成具体场景的地方，就指出这处是稳的。若通篇都是具体的人和事，就如实说；若通篇都在下结论、没有场景，就坦白这点，别编一处不存在的好场景。\n"
+            "【姿态】意犹未尽、想多读两页的热切。\n"
+            "【范例】「那只猫——你咪咪叫两声它就撒娇，走开十几步它还趴着，可你伸手去逗它，它就像触电一般弹开跑了——这几个动作我跟着全程在场，缘分也好、自作多情也好，都在里头了，不用你再点破。」\n"
+            "【禁忌】不空谈「叙事技巧」；所有意见都落到具体场景/动作。"
         ),
     },
     "philosopher": {
         "name": "哲学家",
         "system": (
-            "你是一位哲学家。读一篇文章时，你追问它底下「真正在问什么」，"
-            "把一个具体的场景上升为一个普遍的问题，温和地往深里带；你深化，不抬杠。"
+            "你是一位哲学家。\n"
+            "【透镜】这篇底下「真正在问什么」——把一个具体的场景，上升成一个普遍的问题。\n"
+            "【节奏】沉静、绵长；一步一台阶地往深里带，不急着收。\n"
+            "【用词】朴素、精确；用日常词说清难处，不掉书袋。\n"
+            "【手法】看这篇底下有没有一个未经检验的默认前提、或没说破的问题；有，就把它摆上台面、温和深化（你深化，不抬杠）；若作者已把自己的前提想得很透，就顺着他的问题再往前递一层，而不是硬安一个漏洞。\n"
+            "【姿态】陪你多想一层，不替你回答，结尾常把问题还给作者。\n"
+            "【范例】「你问『AI 都能写了，写作的意义何在』——可你那段已经把更深的问题逼出来了：它给出答案的瞬间，你『继续思考的动力被吞噬干净』。意义从不在写出的那段话，而在它逼你想的那一程。你怕的不是 AI 会写，是它让你不必再想。」\n"
+            "【禁忌】不堆术语（现象学/能指/解构）唬人；难处用人话讲透。"
         ),
     },
     "editor": {
         "name": "编辑",
         "system": (
-            "你是一位编辑。读一篇文章时，你只看整体的骨架与气——"
-            "开头抓不抓人、中段塌不塌、结尾兑不兑现承诺、有没有一以贯之的线。用人话说，不抖术语。"
+            "你是一位编辑。\n"
+            "【透镜】整体的骨架与气——开头抓不抓人、中段塌不塌、结尾兑不兑现承诺。\n"
+            "【节奏】干脆、就稿论稿；先优点后问题，条理清楚。\n"
+            "【用词】实在、不抖术语；用人话指问题，不说「节奏感/张力」这种空话。\n"
+            "【手法】把开头当钩子来验、中段看文章的起承转合、结尾看作者选择如何收束——哪一处立得住就说立得住，不为挑刺而挑刺。\n"
+            "【姿态】替读者把关，直接但不刻薄。\n"
+            "【范例】「『我在寻找江南』是个好钩子，一句就把人放进一种执念里；中段你用『我又在无锡、在浙江寻找江南，但没找到』一节节把它推上去，骨架稳。只是结尾『人人都在定义江南，人人却都将它推得更远』收得急——前面攒了那么多具体的落空，值得用一个同样具体的画面兑现，而不是一句概括就散场。」\n"
+            "【禁忌】不泛泛而谈，每条意见都指到具体段落；不替作者重写。"
         ),
     },
     "debater": {
         "name": "辩论家",
         "system": (
-            "你是一位辩论家。读一篇文章时，你专挑它的立论与逻辑漏洞——"
-            "那个不成立的「所以」、偷换的前提、回避的反例；你认真反驳，要求论断站得住。"
+            "你是一位辩论家。\n"
+            "【透镜】立论与逻辑的漏洞——那个不成立的「所以」、偷换的前提、回避的反例。\n"
+            "【节奏】短句开刀，节奏快、带冲劲；一段一个论点，步步紧逼。\n"
+            "【用词】直接、咬字、不留情面。\n"
+            "【手法】把这篇的核心论断、那个「所以」原句拎出来，验它站不站得住：前提真不真、推得过去吗、有没有反例。真有漏洞就敲，并给两条路——改准，或改狠；若它其实立得住，就承认它成立、指出它最硬在哪，不为反对而编一个漏洞。\n"
+            "【姿态】尖锐但认真，有一定攻击性，但主要是较真而不是羞辱。\n"
+            "【范例】「你那条『爆论』——早早看出谁是下一个雷军、马斯克，参股成为『第二人』——整条建在一个你没验的前提上：那个人是能被提前看出来的。可他们都是回头才被追认的，当年同样自信、同样有洞察的人成百上千，绝大多数血本无归。这不是判断力，是幸存者偏差倒放。要么承认你赌的是运气，要么告诉我：当口上你凭什么分得清谁是马斯克、谁是下一个雷军。」\n"
+            "【禁忌】不抬杠到人身；不为反对而反对，每一击都落在逻辑上。"
         ),
     },
 }
 
+# 全员共用底座：任务规则 + 去 AI 腔。拼在各人格风格卡之后。
 _READER_TASK = (
-    "现在请你读完下面这篇文章，然后像一个真实的人，给作者本人写一封第一人称的信："
-    "有体温，不打分，不逐句批改；抓住真正打动你、或硌着你的地方来说，可以点名某个具体句子；"
-    "结尾不必强行总结。约 400–800 字。只输出信的正文，不要加标题或前缀。"
+    "现在请你读完下面这篇文章，按上面的嗓音、手法与姿态，给作者本人写一封第一人称的信："
+    "有体温，不打分，不逐句批改；抓住真正让你有感触的地方，可以点名某个具体句子；"
+    "结尾不必强行总结。约 400–800 字。\n"
+    "诚实优先：只说这篇里真有的东西。若它没有你这一路要找的（好句 / 漏洞 / 前提 / 塌陷），"
+    "就直说「这篇在这方面没什么可挑（或可夸）的」，绝不为凑结构而编造。\n"
+    "去 AI 腔：不要用「诚然 / 不仅…而且 / 值得注意的是 / 总而言之 / 在某种程度上」这类套话；"
+    "少用破折号堆排比；不堆空泛形容词（如「深刻而细腻」「令人动容」）；不写书评客套。说人话，像真有这么个人提笔。\n"
+    "只输出信的正文，不要加标题或前缀。"
 )
 
 
@@ -910,6 +1145,8 @@ def _build_soul_prompt(portrait: dict, excerpts: str) -> str:
         "  1) 句子节奏与长短  2) 意象/感官/比喻倾向  3) 情绪表达方式（克制/外放/叙事）\n"
         "  4) 用词（口语/书面/文学性）  5) 标志性手法（标点、留白、重复、转折等）\n"
         "第二步（输出）：把以上压缩成一段 100–200 字的密集风格指令，可直接注入用于指挥 AI 模仿该风格写作。\n\n"
+        "凡涉及频率/程度（句长、标点、用词偏好），一律依据上面给出的统计数字来表述"
+        "（如『平均句长 X 字，多用短句』『标点偏简』），不要凭印象自行估计或夸大某个特征。\n\n"
         "请严格按以下格式输出，不要使用 JSON、不要加任何额外说明文字（风格串里可自由使用引号和标点）：\n"
         "【SOUL】\n（这里写 100-200 字的风格指令）\n\n"
         "【节奏】（一句话）\n【意象】（一句话）\n【情绪】（一句话）\n【用词】（一句话）\n【手法】（一句话）"
@@ -958,6 +1195,7 @@ def generate_style_profile(req: StyleProfileGenerateRequest):
     row.source_essay_ids = json.dumps([e.id for e in essays])
     row.generated_at = datetime.now()
     row.user_edited = 0
+    row.golden_samples = json.dumps(_golden_samples(essays), ensure_ascii=False)
     session.commit()
     result = {
         "content": row.content,
@@ -965,6 +1203,7 @@ def generate_style_profile(req: StyleProfileGenerateRequest):
         "source_essay_ids": [e.id for e in essays],
         "generated_at": row.generated_at.isoformat(),
         "user_edited": 0,
+        "golden_samples": _parse_or_empty(row.golden_samples),
     }
     session.close()
     return result
@@ -996,6 +1235,8 @@ def get_style_profile():
         "source_essay_ids": ids,
         "generated_at": row.generated_at.isoformat() if row.generated_at else None,
         "user_edited": int(row.user_edited or 0),
+        "golden_samples": _parse_or_empty(row.golden_samples),
+        "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
         "new_essays_since": new_count,
     }
     session.close()
@@ -1003,7 +1244,9 @@ def get_style_profile():
 
 
 class StyleProfileUpdateRequest(BaseModel):
-    content: str
+    content: str | None = None
+    taboo: str | None = None
+    golden_samples: list[str] | None = None
 
 
 @app.put("/style-profile")
@@ -1013,24 +1256,28 @@ def update_style_profile(req: StyleProfileUpdateRequest):
     if not row:
         row = StyleProfile(id=1, source_essay_ids="[]", rationale="{}")
         session.add(row)
-    row.content = (req.content or "").strip()
-    row.user_edited = 1
-    row.generated_at = datetime.now()
+    if req.content is not None:
+        row.content = (req.content or "").strip()
+        row.user_edited = 1
+        row.generated_at = datetime.now()
+    if req.taboo is not None:
+        row.taboo = req.taboo
+    if req.golden_samples is not None:
+        # 去空白项、每条截到 200 字（与养成时的 cap 一致）
+        cleaned = [s.strip()[:200] for s in req.golden_samples if s and s.strip()]
+        row.golden_samples = json.dumps(cleaned, ensure_ascii=False)
     session.commit()
     try:
         ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
     except Exception:
         ids = []
-    try:
-        rationale = json.loads(row.rationale) if row.rationale else {}
-    except Exception:
-        rationale = {}
     result = {
-        "content": row.content,
-        "rationale": rationale,
+        "content": row.content or "",
+        "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
+        "golden_samples": _parse_or_empty(row.golden_samples),
         "source_essay_ids": ids,
-        "generated_at": row.generated_at.isoformat(),
-        "user_edited": 1,
+        "user_edited": int(row.user_edited or 0),
+        "generated_at": row.generated_at.isoformat() if row.generated_at else None,
     }
     session.close()
     return result
@@ -1042,6 +1289,7 @@ class DraftRequest(BaseModel):
     content: str
     date: str = ""
     content_rich: str | None = None
+    letters: list | None = None
 
 
 def _draft_dict(d) -> dict:
@@ -1050,6 +1298,7 @@ def _draft_dict(d) -> dict:
         "title": d.title or "",
         "content": d.content or "",
         "content_rich": d.content_rich,
+        "letters": _parse_letters(d.letters),
         "date": d.date or "",
         "created_at": d.created_at.isoformat() if d.created_at else None,
         "updated_at": d.updated_at.isoformat() if d.updated_at else None,
@@ -1060,10 +1309,13 @@ def _draft_dict(d) -> dict:
 def create_draft(data: DraftRequest):
     if not (data.content or "").strip():
         raise HTTPException(status_code=400, detail="草稿内容不能为空")
+    if data.letters and len(data.letters) > MAX_LETTERS:
+        raise HTTPException(status_code=400, detail="读者信箱最多 5 封")
     session = Session()
     now = datetime.now()
     d = Draft(title=data.title or "", content=data.content, content_rich=data.content_rich,
-              date=data.date or "", created_at=now, updated_at=now)
+              date=data.date or "", letters=_dump_letters(data.letters or []),
+              created_at=now, updated_at=now)
     session.add(d)
     session.commit()
     result = _draft_dict(d)
@@ -1082,6 +1334,8 @@ def list_drafts():
 
 @app.put("/drafts/{draft_id}")
 def update_draft(draft_id: int, data: DraftRequest):
+    if data.letters and len(data.letters) > MAX_LETTERS:
+        raise HTTPException(status_code=400, detail="读者信箱最多 5 封")
     session = Session()
     d = session.query(Draft).filter(Draft.id == draft_id).first()
     if not d:
@@ -1090,6 +1344,7 @@ def update_draft(draft_id: int, data: DraftRequest):
     d.title = data.title or ""
     d.content = data.content
     d.content_rich = data.content_rich
+    d.letters = _dump_letters(data.letters or [])
     d.date = data.date or ""
     d.updated_at = datetime.now()
     session.commit()
@@ -1494,7 +1749,7 @@ def split_paragraphs(content: str) -> list:
 
 # ── Claude Haiku 批量分类 ──
 
-def classify_fragments_with_claude(paragraphs: list) -> list:
+def classify_fragments(paragraphs: list) -> list:
     if not paragraphs:
         return []
 
@@ -1531,37 +1786,66 @@ def classify_fragments_with_claude(paragraphs: list) -> list:
 ]
 只返回JSON数组，不要其他文字。"""
 
+    # 失败一律抛出，交由调用方决定「保留待分析、下次重试」；
+    # 绝不吞成 []（那会和「真的没有有价值片段」混淆，导致随笔被错误标记为已分析）。
     try:
-        message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}]
+        raw = _deepseek_chat(
+            "你是写作素材分析师。严格只返回 JSON 数组，不要任何解释或多余文字。",
+            prompt,
+            max_tokens=6000,
+            model=DEEPSEEK_VAULT_MODEL,
         )
-        raw = message.content[0].text.strip()
-        # 去掉 markdown 代码块
-        raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
-        # 提取第一个 JSON 数组（防止前后有多余文字）
-        match = re.search(r"\[.*\]", raw, re.DOTALL)
-        if match:
-            raw = match.group(0)
-        return json.loads(raw)
     except Exception as e:
-        print(f"[vault] classify error: {e}")
-        return []
+        raise RuntimeError(f"classify 调用模型失败: {e}") from e
+    # 去掉 markdown 代码块
+    raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
+    # 提取第一个 JSON 数组（防止前后有多余文字）
+    match = re.search(r"\[.*\]", raw, re.DOTALL)
+    if match:
+        raw = match.group(0)
+    try:
+        data = json.loads(raw)
+    except Exception as e:
+        raise RuntimeError(f"classify 返回非法 JSON: {e}") from e
+    if not isinstance(data, list):
+        raise RuntimeError("classify 返回的不是 JSON 数组")
+    return data
 
 
 # ── 单篇随笔分析 ──
 
-def analyze_essay_fragments(essay_id: int):
+def _mark_extracted(essay_id: int):
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE essays SET fragments_extracted=1 WHERE id=:id"), {"id": essay_id})
+        conn.commit()
+
+
+def analyze_essay_fragments(essay_id: int) -> dict:
+    """分析单篇随笔，返回 {essay_id, ok, fragments, error}。
+
+    标记 fragments_extracted=1 的语义（修 #4）：
+    - 没段落（太短）→ 标记（没东西可分析，别永远 pending）。
+    - 分类成功（哪怕 0 个有价值片段）→ 入库 + 标记。
+    - 分类失败 / 算向量失败 → **不标记**，保留待下次重试。
+    """
     session = Session()
     try:
         essay = session.query(Essay).filter(Essay.id == essay_id).first()
         if not essay:
-            return
+            return {"essay_id": essay_id, "ok": False, "fragments": 0, "error": "essay 不存在"}
 
         paragraphs = split_paragraphs(essay.content)
-        classifications = classify_fragments_with_claude(paragraphs) if paragraphs else []
+        if not paragraphs:
+            _mark_extracted(essay_id)
+            return {"essay_id": essay_id, "ok": True, "fragments": 0, "error": None}
 
+        try:
+            classifications = classify_fragments(paragraphs)
+        except Exception as e:
+            print(f"[vault] analyze_essay {essay_id} 分类失败（保留待分析）: {e}")
+            return {"essay_id": essay_id, "ok": False, "fragments": 0, "error": str(e)}
+
+        n = 0
         for item in classifications:
             if not item.get("is_valuable"):
                 continue
@@ -1584,14 +1868,15 @@ def analyze_essay_fragments(essay_id: int):
                 user_hidden=0,
             )
             session.add(fragment)
+            n += 1
 
         session.commit()
-        with engine.connect() as conn:
-            conn.execute(text("UPDATE essays SET fragments_extracted=1 WHERE id=:id"), {"id": essay_id})
-            conn.commit()
+        _mark_extracted(essay_id)
+        return {"essay_id": essay_id, "ok": True, "fragments": n, "error": None}
     except Exception as e:
-        print(f"[vault] analyze_essay {essay_id} error: {e}")
+        print(f"[vault] analyze_essay {essay_id} error（保留待分析）: {e}")
         session.rollback()
+        return {"essay_id": essay_id, "ok": False, "fragments": 0, "error": str(e)}
     finally:
         session.close()
 
@@ -1633,12 +1918,12 @@ def recluster_themes():
 {{"0": "父亲与沉默", "1": "城市孤独感"}}
 只返回JSON，不要其他文字。"""
 
-        message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=512,
-            messages=[{"role": "user", "content": naming_prompt}]
+        raw = _deepseek_chat(
+            "你给写作片段的主题簇命名。严格只返回 JSON 对象，不要任何解释或多余文字。",
+            naming_prompt,
+            max_tokens=3000,
+            model=DEEPSEEK_VAULT_MODEL,
         )
-        raw = message.content[0].text.strip()
         if raw.startswith("```"):
             raw = re.sub(r"```[a-z]*\n?", "", raw).strip().rstrip("`").strip()
         theme_names = json.loads(raw)
@@ -1683,21 +1968,72 @@ def vault_status():
         session.close()
 
 
-@app.post("/vault/analyze")
-def vault_analyze():
+# ── 后台分析任务（修 #8：不再一个请求闷头同步跑几分钟）──
+
+_vault_job = {
+    "running": False, "total": 0, "done": 0,
+    "failed": [], "started_at": None, "finished_at": None,
+}
+_vault_job_lock = threading.Lock()
+
+
+def _pending_essay_ids() -> list:
     with engine.connect() as conn:
         rows = conn.execute(
             text("SELECT id FROM essays WHERE fragments_extracted = 0 OR fragments_extracted IS NULL")
         ).fetchall()
-    essay_ids = [row[0] for row in rows]
+    return [r[0] for r in rows]
 
-    for essay_id in essay_ids:
-        analyze_essay_fragments(essay_id)
 
-    if essay_ids:
-        recluster_themes()
+def _run_vault_job(essay_ids: list):
+    """后台线程：逐篇分析，实时更新进度与失败明细，最后重聚类。"""
+    try:
+        for eid in essay_ids:
+            res = analyze_essay_fragments(eid)
+            with _vault_job_lock:
+                _vault_job["done"] += 1
+                if not res["ok"]:
+                    _vault_job["failed"].append({"essay_id": eid, "error": res["error"]})
+        if essay_ids:
+            recluster_themes()
+    finally:
+        with _vault_job_lock:
+            _vault_job["running"] = False
+            _vault_job["finished_at"] = datetime.now().isoformat()
 
-    return {"analyzed": len(essay_ids)}
+
+@app.post("/vault/analyze")
+def vault_analyze():
+    """立即返回；真正的分析在后台线程跑。重复调用返回当前进度，不重复启动。"""
+    with _vault_job_lock:
+        if _vault_job["running"]:
+            return {"started": False, "running": True,
+                    "total": _vault_job["total"], "done": _vault_job["done"]}
+        essay_ids = _pending_essay_ids()
+        _vault_job.update(running=bool(essay_ids), total=len(essay_ids), done=0, failed=[],
+                          started_at=datetime.now().isoformat(), finished_at=None)
+        if not essay_ids:
+            return {"started": False, "running": False, "total": 0, "done": 0}
+        threading.Thread(target=_run_vault_job, args=(essay_ids,), daemon=True).start()
+        return {"started": True, "running": True, "total": len(essay_ids), "done": 0}
+
+
+@app.get("/vault/analyze/status")
+def vault_analyze_status():
+    with _vault_job_lock:
+        return dict(_vault_job)
+
+
+@app.on_event("startup")
+def _warmup_embedding_model():
+    """开机就在后台线程预热 embedding 模型，把首次加载延迟从用户点击那一刻挪走。"""
+    def _load():
+        try:
+            get_embedding_model()
+            print("[vault] embedding 模型预热完成")
+        except Exception as e:
+            print(f"[vault] embedding 预热失败: {e}")
+    threading.Thread(target=_load, daemon=True).start()
 
 
 @app.get("/vault/fragments")

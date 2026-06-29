@@ -4,6 +4,7 @@ import WordCloud from '../components/WordCloud'
 import HeatMap from '../components/HeatMap'
 import TodayReview from '../components/TodayReview'
 import WelcomeCard from '../components/WelcomeCard'
+import Icon, { Face } from '../components/Icon'
 import HintBar from '../components/HintBar'
 import SentimentTimeline from '../components/SentimentTimeline'
 import DateRangePicker from '../components/DateRangePicker'
@@ -11,9 +12,9 @@ import DateRangePicker from '../components/DateRangePicker'
 const PAGE_SIZE = 20
 
 const sentimentLabel = (score) => {
-  if (score > 0.65) return '😊 积极'
-  if (score < 0.35) return '😔 消极'
-  return '😐 平静'
+  if (score > 0.65) return '积极'
+  if (score < 0.35) return '消极'
+  return '平静'
 }
 
 const sentimentClass = (score) => {
@@ -173,7 +174,10 @@ export default function Overview({ onSelect, onWrite, startDate, endDate, onRang
               <div className="card-label">总字数</div>
             </div>
             <div className="card">
-              <div className="card-num">{sentimentLabel(stats.avg_sentiment)}</div>
+              <div className="card-num">
+                <Face mood={sentimentClass(stats.avg_sentiment)} className="mood-face--lg" />
+                {sentimentLabel(stats.avg_sentiment)}
+              </div>
               <div className="card-label">整体情绪</div>
             </div>
           </div>
@@ -216,7 +220,7 @@ export default function Overview({ onSelect, onWrite, startDate, endDate, onRang
         <h2>所有随笔</h2>
 
         <div className="search-wrap">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><Icon name="search" className="seal-ic--sm seal-ic--plain" /></span>
           <input
             className="search-input"
             placeholder="搜索标题或正文内容…"

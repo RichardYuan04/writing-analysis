@@ -3,6 +3,7 @@ import { getPortrait, essayDeepAnalysis } from '../api'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import EssayPicker from '../components/EssayPicker'
 import SoulDocPanel from '../components/SoulDocPanel'
+import { SealChar } from '../components/Icon'
 import {
   AuthorCard, WordCloudPanel, DimensionsPanel,
   StructureTimeline, KeyPointsPanel, SentimentBar,
@@ -83,15 +84,15 @@ export default function Portrait() {
       <div className="section">
         <h2>风格解读</h2>
         <div className="portrait-dims">
-          <DimRow icon="🎭" label="情感基调" value={portrait.tone} />
-          <DimRow icon="✍️" label="句式偏好" value={portrait.sentence_style} />
-          <DimRow icon="📚" label="词汇丰富度" value={portrait.vocab_richness} />
-          <DimRow icon="🧭" label="叙事视角" value={portrait.self_orientation} />
-          <DimRow icon="⏳" label="时间取向" value={portrait.time_orient} />
-          <DimRow icon="💬" label="标点习惯" value={portrait.punct_style} />
-          <DimRow icon="📄" label="段落风格" value={portrait.para_style} />
-          <DimRow icon="📝" label="篇幅偏好" value={portrait.volume_style} />
-          <DimRow icon="🔤" label="词性倾向" value={portrait.pos_style} />
+          <DimRow icon="情" label="情感基调" value={portrait.tone} />
+          <DimRow icon="句" label="句式偏好" value={portrait.sentence_style} />
+          <DimRow icon="词" label="词汇丰富度" value={portrait.vocab_richness} />
+          <DimRow icon="叙" label="叙事视角" value={portrait.self_orientation} />
+          <DimRow icon="时" label="时间取向" value={portrait.time_orient} />
+          <DimRow icon="标" label="标点习惯" value={portrait.punct_style} />
+          <DimRow icon="段" label="段落风格" value={portrait.para_style} />
+          <DimRow icon="篇" label="篇幅偏好" value={portrait.volume_style} />
+          <DimRow icon="性" label="词性倾向" value={portrait.pos_style} />
         </div>
       </div>
 
@@ -133,7 +134,7 @@ export default function Portrait() {
 function DimRow({ icon, label, value }) {
   return (
     <div className="dim-row">
-      <span className="dim-icon">{icon}</span>
+      <SealChar char={icon} className="seal-ic--sm" />
       <span className="dim-label">{label}</span>
       <span className="dim-value">{value}</span>
     </div>

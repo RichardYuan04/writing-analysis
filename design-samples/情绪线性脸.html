@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-family="desk" data-mode="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>情绪线性脸 · 设计稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Noto+Serif+SC:wght@400;500;600&family=Spectral:ital,wght@0,400;0,500&display=swap" rel="stylesheet" />
+<style>
+:root{--radius-sm:6px;--radius-md:10px;--radius-lg:16px;
+  --font-display:'Fraunces',Georgia,serif;--font-serif:'Noto Serif SC',Georgia,serif;--font-sans:'Spectral','PingFang SC',system-ui,sans-serif;
+  --card-grad:linear-gradient(160deg,var(--panel),var(--panel2));--shadow-glow:0 0 36px -22px var(--glow);}
+:root[data-mode="dark"]{--shadow-card:0 22px 44px -28px rgba(0,0,0,.85)}
+:root[data-mode="light"]{--shadow-card:0 18px 40px -28px rgba(40,34,24,.34)}
+:root[data-family="desk"][data-mode="dark"]{--bg:#17110b;--bg2:#1e1610;--panel:#241a11;--panel2:#1b130c;--text-primary:#f1e7d6;--text-secondary:#c6b39a;--text-hint:#8c7560;--accent:#e89b50;--accent-light:#f3c781;--border:#3a2c1d;--border-soft:#2e2317;--glow:rgba(232,155,80,.22);--sentiment-positive:#e89b50;--sentiment-negative:#7c9cc0;--sentiment-neutral:#9c8568;}
+:root[data-family="desk"][data-mode="light"]{--bg:#f4ebdd;--bg2:#fbf5ea;--panel:#fffdf7;--panel2:#fbf4e8;--text-primary:#2a2015;--text-secondary:#6c5945;--text-hint:#a8927b;--accent:#c87a2e;--accent-light:#b07d28;--border:#e6d8c2;--border-soft:#efe4d2;--glow:rgba(200,122,46,.14);--sentiment-positive:#c87a2e;--sentiment-negative:#5f7a96;--sentiment-neutral:#b3a085;}
+:root[data-family="ocean"][data-mode="dark"]{--bg:#0a1622;--bg2:#0e1d2e;--panel:#12283c;--panel2:#0d1f30;--text-primary:#e6f0f7;--text-secondary:#a6c2d4;--text-hint:#5f7e92;--accent:#3fa9d4;--accent-light:#7fd6e8;--border:#21455f;--border-soft:#18344a;--glow:rgba(63,169,212,.22);--sentiment-positive:#3fa9d4;--sentiment-negative:#d08a8a;--sentiment-neutral:#5f7e92;}
+:root[data-family="ocean"][data-mode="light"]{--bg:#eaf4fa;--bg2:#f3f9fc;--panel:#ffffff;--panel2:#eef6fb;--text-primary:#0e2a3d;--text-secondary:#3f6377;--text-hint:#8fadbe;--accent:#1f87b8;--accent-light:#2a9fc8;--border:#cfe3ef;--border-soft:#e1eef6;--glow:rgba(31,135,184,.13);--sentiment-positive:#1f87b8;--sentiment-negative:#b06a6a;--sentiment-neutral:#8fadbe;}
+:root[data-family="sakura"][data-mode="dark"]{--bg:#1a121a;--bg2:#241726;--panel:#2a1b2c;--panel2:#1f1420;--text-primary:#f6e9f0;--text-secondary:#d3b4c6;--text-hint:#9a7d8e;--accent:#e487ad;--accent-light:#f6b8d2;--border:#4a2c3d;--border-soft:#3a2230;--glow:rgba(228,135,173,.22);--sentiment-positive:#e487ad;--sentiment-negative:#9bb0d0;--sentiment-neutral:#9a7d8e;}
+:root[data-family="summer"][data-mode="dark"]{--bg:#0c1710;--bg2:#102016;--panel:#15281b;--panel2:#0f1f14;--text-primary:#e6f1e3;--text-secondary:#aac4ab;--text-hint:#5f7e64;--accent:#5fae5a;--accent-light:#9fd07a;--border:#264a30;--border-soft:#1c3a24;--glow:rgba(95,174,90,.22);--sentiment-positive:#7fbf66;--sentiment-negative:#d08a8a;--sentiment-neutral:#8a9a78;}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);background:radial-gradient(120% 80% at 80% -10%,var(--bg2),var(--bg) 60%);color:var(--text-primary);min-height:100vh;padding:32px clamp(16px,4vw,48px) 64px;transition:background .5s,color .5s}
+.shell{max-width:980px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:6px;flex-wrap:wrap}
+.brand{font-family:var(--font-display);font-style:italic;font-size:15px;color:var(--accent)}
+.brand small{font-style:normal;font-family:var(--font-sans);color:var(--text-hint);margin-left:8px;font-size:12px}
+.theme-ctl{margin-left:auto;display:flex;align-items:center;gap:8px}
+.swatches{display:flex;gap:6px}
+.sw{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;transition:transform .2s}
+.sw:hover{transform:scale(1.15)}
+.sw[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--glow)}
+.sw.desk{background:linear-gradient(135deg,#241a11,#e89b50)}.sw.ocean{background:linear-gradient(135deg,#12283c,#3fa9d4)}.sw.sakura{background:linear-gradient(135deg,#2a1b2c,#e487ad)}.sw.summer{background:linear-gradient(135deg,#15281b,#5fae5a)}
+.mode-btn{border:1px solid var(--border);background:var(--panel);color:var(--accent);font-size:12px;padding:5px 12px;border-radius:16px;cursor:pointer;font-family:var(--font-sans)}
+h1.page-h{font-family:var(--font-display);font-weight:600;font-size:clamp(24px,3vw,32px);margin:12px 0 4px}
+.page-sub{color:var(--text-secondary);font-size:14px;max-width:60ch;line-height:1.7}
+.page-sub em{font-style:italic;color:var(--accent)}
+
+.card{background:var(--card-grad);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px 24px;margin-top:20px;position:relative;overflow:hidden}
+.card::after{content:"";position:absolute;top:-40%;right:-8%;width:160px;height:160px;border-radius:50%;background:var(--glow);filter:blur(32px);pointer-events:none}
+.card h2{font-family:var(--font-serif);font-size:15px;font-weight:600;color:var(--accent);margin-bottom:4px;position:relative}
+.card .h-sub{font-size:12px;color:var(--text-hint);margin-bottom:18px;position:relative}
+
+/* 脸 */
+.face{display:inline-grid;place-items:center;flex-shrink:0}
+.face svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;width:100%;height:100%}
+.face-lg{width:46px;height:46px}.face-md{width:24px;height:24px}.face-sm{width:18px;height:18px}
+.s-positive{color:var(--sentiment-positive)}.s-neutral{color:var(--sentiment-neutral)}.s-negative{color:var(--sentiment-negative)}
+
+.variant-row{display:flex;gap:34px;flex-wrap:wrap;position:relative}
+.vlabel{font-family:var(--font-display);font-style:italic;font-size:12px;color:var(--text-hint);width:84px;flex-shrink:0;padding-top:14px}
+.facecell{display:flex;flex-direction:column;align-items:center;gap:8px}
+.facecell .l{font-size:12px;color:var(--text-secondary)}
+.vsep{height:1px;background:var(--border-soft);margin:18px 0;position:relative}
+
+/* 实际位置 */
+.ctx-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;position:relative}
+@media(max-width:680px){.ctx-grid{grid-template-columns:1fr}}
+.mini{background:var(--panel2);border:1px solid var(--border-soft);border-radius:var(--radius-md);padding:16px 18px}
+.mini-t{font-size:11px;color:var(--text-hint);margin-bottom:12px;letter-spacing:.5px}
+/* 平均情绪大卡 */
+.statnum{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:12px}
+.statlab{font-size:12px;color:var(--text-hint);margin-top:4px}
+/* 随笔行标签 */
+.tagrow{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary)}
+/* 今日回顾角标 */
+.tr{position:relative;background:var(--card-grad);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 16px}
+.tr-corner{position:absolute;top:12px;right:14px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-hint)}
+.tr-title{font-family:var(--font-serif);font-size:14px;color:var(--text-primary);margin-bottom:6px}
+.tr-body{font-size:12.5px;color:var(--text-secondary);line-height:1.6;max-width:80%}
+
+/* 圆点对比 */
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dot.s-positive{background:var(--sentiment-positive)}.dot.s-neutral{background:var(--sentiment-neutral)}.dot.s-negative{background:var(--sentiment-negative)}
+.cmp-row{display:flex;gap:28px;flex-wrap:wrap;align-items:center;position:relative}
+.cmp-cell{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary)}
+
+.foot{margin-top:30px;color:var(--text-hint);font-size:12px;line-height:1.8;border-top:1px solid var(--border-soft);padding-top:16px}
+.foot b{color:var(--text-secondary);font-weight:500}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">情绪表情 · 线性脸<small>SENTIMENT FACES · 设计稿</small></div>
+    <div class="theme-ctl">
+      <div class="swatches" id="sw">
+        <button class="sw desk" data-f="desk" aria-current="true"></button>
+        <button class="sw ocean" data-f="ocean"></button>
+        <button class="sw sakura" data-f="sakura"></button>
+        <button class="sw summer" data-f="summer"></button>
+      </div>
+      <button class="mode-btn" id="mode">☾ 夜</button>
+    </div>
+  </div>
+
+  <h1 class="page-h">三张线性脸 · 替代 😊😔😐</h1>
+  <p class="page-sub">手绘三张 <em>currentColor</em> 线性脸（积极 / 平静 / 消极），用你已有的情绪三色着色，随主题自动变色。两种画法供选：<em>圆脸</em>（更像「脸」、更暖）与 <em>无圈极简</em>（更克制、更像符号）。</p>
+
+  <div class="card">
+    <h2>两种画法</h2>
+    <div class="h-sub">同一套表情，带不带脸圈。每张按情绪色着色。</div>
+    <div class="variant-row">
+      <span class="vlabel">圆脸</span>
+      <div id="round-row" style="display:flex;gap:34px;flex-wrap:wrap"></div>
+    </div>
+    <div class="vsep"></div>
+    <div class="variant-row">
+      <span class="vlabel">无圈极简</span>
+      <div id="plain-row" style="display:flex;gap:34px;flex-wrap:wrap"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>放进实际位置</h2>
+    <div class="h-sub">下面用「圆脸」版演示；最终用哪种以你选定为准。</div>
+    <div class="ctx-grid">
+      <div class="mini">
+        <div class="mini-t">平均情绪大卡片（总览）</div>
+        <div class="statnum"><span class="face face-lg s-positive" id="ctx-stat"></span>积极</div>
+        <div class="statlab">平均情绪</div>
+      </div>
+      <div class="mini">
+        <div class="mini-t">随笔行情绪标签</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span class="tagrow"><span class="face face-sm s-positive" data-face="positive"></span>积极</span>
+          <span class="tagrow"><span class="face face-sm s-neutral" data-face="neutral"></span>平静</span>
+          <span class="tagrow"><span class="face face-sm s-negative" data-face="negative"></span>消极</span>
+        </div>
+      </div>
+      <div class="mini" style="grid-column:1 / -1">
+        <div class="mini-t">今日回顾面板（右上角表情）</div>
+        <div class="tr">
+          <span class="tr-corner">2026-06-22 · <span class="face face-sm s-negative" data-face="negative"></span></span>
+          <div class="tr-title">夜里十一点的便利店</div>
+          <div class="tr-body">我买了一瓶水，其实并不渴。灯白得没有影子……</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>对比：当前已上线的「情绪色圆点」</h2>
+    <div class="h-sub">你现在用的方案，放一起好对比。</div>
+    <div class="cmp-row">
+      <span class="cmp-cell"><span class="dot s-positive"></span>积极</span>
+      <span class="cmp-cell"><span class="dot s-neutral"></span>平静</span>
+      <span class="cmp-cell"><span class="dot s-negative"></span>消极</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>这是对比稿。</b>线条还可再精修（嘴角弧度、眼睛位置）。你定：① 用线性脸还是保留圆点；② 若用脸，圆脸 / 无圈极简选哪个。定了我替换总览大卡、随笔行、今日回顾角标三处。
+  </div>
+</div>
+
+<script>
+const MOODS=[{key:'positive',lab:'积极'},{key:'neutral',lab:'平静'},{key:'negative',lab:'消极'}];
+const EYES_R='<circle cx="9.2" cy="10.2" r="0.95" fill="currentColor" stroke="none"/><circle cx="14.8" cy="10.2" r="0.95" fill="currentColor" stroke="none"/>';
+const MOUTH_R={positive:'<path d="M8.4 13.8 Q12 16.8 15.6 13.8"/>',neutral:'<line x1="8.8" y1="14.6" x2="15.2" y2="14.6"/>',negative:'<path d="M8.4 15.4 Q12 12.4 15.6 15.4"/>'};
+function roundSvg(m){return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/>'+EYES_R+MOUTH_R[m]+'</svg>';}
+const EYES_P='<circle cx="8.4" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.6" cy="9" r="1.1" fill="currentColor" stroke="none"/>';
+const MOUTH_P={positive:'<path d="M7 13.5 Q12 18 17 13.5"/>',neutral:'<line x1="7.5" y1="14.5" x2="16.5" y2="14.5"/>',negative:'<path d="M7 15 Q12 11 17 15"/>'};
+function plainSvg(m){return '<svg viewBox="0 0 24 24" stroke-width="1.8">'+EYES_P+MOUTH_P[m]+'</svg>';}
+
+const roundRow=document.getElementById('round-row'), plainRow=document.getElementById('plain-row');
+MOODS.forEach(m=>{
+  roundRow.insertAdjacentHTML('beforeend',`<div class="facecell"><span class="face face-lg s-${m.key}">${roundSvg(m.key)}</span><span class="l">${m.lab}</span></div>`);
+  plainRow.insertAdjacentHTML('beforeend',`<div class="facecell"><span class="face face-lg s-${m.key}">${plainSvg(m.key)}</span><span class="l">${m.lab}</span></div>`);
+});
+// 实际位置里用圆脸
+document.getElementById('ctx-stat').innerHTML=roundSvg('positive');
+document.querySelectorAll('[data-face]').forEach(el=>{el.innerHTML=roundSvg(el.dataset.face);});
+
+document.getElementById('sw').addEventListener('click',e=>{const b=e.target.closest('.sw');if(!b)return;document.documentElement.dataset.family=b.dataset.f;[...document.querySelectorAll('.sw')].forEach(s=>s.setAttribute('aria-current',s===b));});
+document.getElementById('mode').addEventListener('click',e=>{const r=document.documentElement;const d=r.dataset.mode==='dark';r.dataset.mode=d?'light':'dark';e.target.textContent=d?'☀ 昼':'☾ 夜';});
+</script>
+</body>
+</html>

@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { assistReader } from '../api'
 import Icon from './Icon'
+import ReaderLetterModal from './ReaderLetterModal'
 
-// 5 个固定人格读者。字徽 + 名 + 一行「在意什么」。
-const READERS = [
+// 5 个固定人格读者（导出供详情页复用）。
+export const READERS = [
   { key: 'poet', glyph: '诗', name: '诗人', care: '意象 · 节奏 · 语言质地' },
   { key: 'novelist', glyph: '叙', name: '小说家', care: '人物 · 场景 · 是演还是讲' },
   { key: 'philosopher', glyph: '哲', name: '哲学家', care: '这篇底下真正在问什么' },
@@ -13,31 +12,13 @@ const READERS = [
 ]
 
 /**
- * 读者视角：从右栏紧凑入口选一位读者 → 读整篇 → 浮层呈现一封信。
- * props: getDoc() => { title, content }   读取当前编辑器内容（整篇）
- *        collapsed, onToggle
- * 信只读、不替换原文。
+ * 写作页读者视角入口。
+ * props: getDoc() => {title, content}; collapsed, onToggle;
+ *        onSaveLetter(reader, content) 把信留存到当前稿子; savedCount 已存封数。
  */
-export default function ReaderPanel({ getDoc, collapsed, onToggle }) {
-  const [reader, setReader] = useState(null)   // 当前选中的读者
-  const [loading, setLoading] = useState(false)
-  const [letter, setLetter] = useState('')
-  const [error, setError] = useState('')
-
-  const ask = async (r) => {
-    const { title, content } = getDoc()
-    if (!content.trim()) { setError('先写点东西，再请人来读。'); setReader(r); setLetter(''); return }
-    setReader(r); setLoading(true); setLetter(''); setError('')
-    try {
-      const res = await assistReader({ title, content, persona: r.key })
-      setLetter(res.data.letter || '')
-    } catch {
-      setError('AI 调用失败，请稍后再试')
-    } finally {
-      setLoading(false)
-    }
-  }
-  const close = () => { setReader(null); setLetter(''); setError(''); setLoading(false) }
+export default function ReaderPanel({ getDoc, collapsed, onToggle, onSaveLetter, savedCount = 0 }) {
+  const [reader, setReader] = useState(null)
+  const atLimit = savedCount >= 5
 
   if (collapsed) {
     return (
@@ -57,7 +38,7 @@ export default function ReaderPanel({ getDoc, collapsed, onToggle }) {
         <div className="rp-tip">今天，请谁读完你这篇？换一个人，在意的东西就变。</div>
         <div className="rp-readers">
           {READERS.map(r => (
-            <button key={r.key} className="rp-reader" onClick={() => ask(r)}>
+            <button key={r.key} className="rp-reader" onClick={() => setReader(r)}>
               <span className="rp-seal">{r.glyph}</span>
               <span className="rp-meta">
                 <span className="rp-name">{r.name}</span>
@@ -66,31 +47,25 @@ export default function ReaderPanel({ getDoc, collapsed, onToggle }) {
             </button>
           ))}
         </div>
+        {onSaveLetter && (
+          <div className="rp-count">
+            <span className="rp-count-label">读者信箱</span>
+            <span className="rp-dots">
+              {[0, 1, 2, 3, 4].map((i) => <i key={i} className={i < savedCount ? 'on' : ''} />)}
+            </span>
+            <span className="rp-count-n">{atLimit ? '已满' : `${savedCount}/5`}</span>
+          </div>
+        )}
       </aside>
 
-      {reader && createPortal(
-        <div className="modal-overlay" onClick={close}>
-          <div className="letter-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="lm-head">
-              <span className="lm-seal">{reader.glyph}</span>
-              <span className="lm-who">{reader.name}</span>
-              <button className="lm-x" onClick={close}>✕</button>
-            </div>
-            {loading ? (
-              <div className="lm-typing">{reader.name} 正在读…</div>
-            ) : error ? (
-              <div className="lm-err">{error}</div>
-            ) : (
-              <div className="lm-body">{letter}</div>
-            )}
-            <div className="lm-acts">
-              {!loading && !error && <button className="ap-btn" onClick={() => ask(reader)}>让他再读一遍</button>}
-              <button className="ap-ghost" onClick={close}>合上信</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <ReaderLetterModal
+        reader={reader}
+        getDoc={getDoc}
+        onClose={() => setReader(null)}
+        onSave={onSaveLetter ? (rd, content) => onSaveLetter(rd, content) : undefined}
+        saveDisabled={atLimit}
+        saveHint="读者信箱已满（5/5），去文章详情页删几封"
+      />
     </>
   )
 }

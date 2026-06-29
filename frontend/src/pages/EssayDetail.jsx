@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { getEssay, deleteEssay, updateEssay } from '../api'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import WordCloud from '../components/WordCloud'
 import MoodCard from '../components/MoodCard'
 import RichEditor from '../components/RichEditor'
 import RichViewer from '../components/RichViewer'
 import { blocksToPlainText, parseRich } from '../components/richSchema'
+import ReaderLetterbox from '../components/ReaderLetterbox'
 
 export default function EssayDetail({ id, onBack }) {
   const [essay, setEssay] = useState(null)
@@ -68,7 +68,9 @@ export default function EssayDetail({ id, onBack }) {
     return '😐 平静'
   }
 
-  const posData = Object.entries(essay.pos_distribution || {}).map(([k, v]) => ({ name: k, count: v }))
+  const posData = POS_ORDER
+    .filter(k => essay.pos_distribution?.[k])
+    .map(k => ({ name: k, count: essay.pos_distribution[k], color: POS_COLORS[k] }))
 
   return (
     <div className="detail">
@@ -133,43 +135,110 @@ export default function EssayDetail({ id, onBack }) {
             <MoodCard mood={essay.mood_card} variant="persisted" />
           )}
 
+          <ReaderLetterbox
+            essayId={essay.id}
+            title={essay.title}
+            content={essay.content}
+            initialLetters={essay.letters || []}
+          />
+
           <div className="detail-analysis">
             <section className="section">
               <h2>词云</h2>
               <WordCloud words={essay.top_words} />
             </section>
 
-            {posData.length > 0 && (
-              <section className="section">
-                <h2>词性分布</h2>
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={posData}>
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </section>
-            )}
-
-            <section className="section">
-              <h2>高频词 Top 10</h2>
-              <div className="top-words">
-                {essay.top_words?.slice(0, 10).map((w, i) => (
-                  <div key={w.word} className="top-word-item">
-                    <span className="rank">#{i + 1}</span>
-                    <span className="word">{w.word}</span>
-                    <span className="count">{w.count} 次</span>
-                  </div>
-                ))}
+            <div className="detail-cols">
+              {/* 左列：词性分布（矮）+ 情绪分布（中），叠起来与右列等高 */}
+              <div className="detail-col">
+                {posData.length > 0 && (
+                  <section className="section">
+                    <h2>词性分布</h2>
+                    <PosDonut data={posData} />
+                  </section>
+                )}
+                {essay.emotion_detail && <EmotionBreakdown detail={essay.emotion_detail} />}
               </div>
-            </section>
 
-            {essay.emotion_detail && <EmotionBreakdown detail={essay.emotion_detail} />}
+              {/* 右列：高频词 Top 10（满十行） */}
+              <div className="detail-col">
+                <section className="section">
+                  <h2>高频词 Top 10</h2>
+                  <div className="top-words">
+                    {essay.top_words?.slice(0, 10).map((w, i) => (
+                      <div key={w.word} className="top-word-item">
+                        <span className="rank">#{i + 1}</span>
+                        <span className="word">{w.word}</span>
+                        <span className="count">{w.count} 次</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// 词性：固定展示顺序 + 各自语义色（取自全站调色板，明暗主题通用）
+// 「其他」= 连词/介词/助词/数词/量词等，用中性灰，让有信息量的词性更醒目
+const POS_ORDER = ['名词', '动词', '形容词', '副词', '代词', '其他']
+const POS_COLORS = {
+  名词: '#8aa0bc', 动词: '#9aab78', 形容词: '#d6a468',
+  副词: '#bd8aa2', 代词: '#7ba39b', 其他: '#c2bcc8',
+}
+const POS_CONTENT = ['名词', '动词', '形容词']   // 实词：中心主导词只在这三类里选
+
+// 自定义 SVG 环形图：按占比分段着色，中心点出主导词性，右侧图例列三项百分比
+function PosDonut({ data }) {
+  const total = data.reduce((s, d) => s + d.count, 0) || 1
+  const pct = (n) => Math.round((n / total) * 100)
+  // 中心点出主导「实词」（名/动/形里占比最高的），不让「其他」抢焦点
+  const contentData = data.filter(d => POS_CONTENT.includes(d.name))
+  const dominant = (contentData.length ? contentData : data).reduce((a, b) => (b.count > a.count ? b : a))
+
+  const R = 54, STROKE = 20, C = 2 * Math.PI * R
+  let acc = 0   // 累计占比，用于排布各段起点
+
+  return (
+    <div className="pos-donut-wrap">
+      <div className="pos-donut">
+        <svg viewBox="0 0 140 140" width="140" height="140" aria-hidden="true">
+          <circle cx="70" cy="70" r={R} fill="none" stroke="var(--border-soft)" strokeWidth={STROKE} opacity="0.5" />
+          <g transform="rotate(-90 70 70)">
+            {data.map((d) => {
+              const frac = d.count / total
+              const seg = (
+                <circle
+                  key={d.name}
+                  cx="70" cy="70" r={R} fill="none"
+                  stroke={d.color} strokeWidth={STROKE} strokeLinecap="butt"
+                  strokeDasharray={`${frac * C} ${C - frac * C}`}
+                  strokeDashoffset={-acc * C}
+                />
+              )
+              acc += frac
+              return seg
+            })}
+          </g>
+        </svg>
+        <div className="pos-donut-center">
+          <div className="pos-dom-name">{dominant.name}</div>
+          <div className="pos-dom-pct">{pct(dominant.count)}%</div>
+        </div>
+      </div>
+      <div className="pos-legend">
+        {data.map((d) => (
+          <div key={d.name} className="pos-legend-row">
+            <span className="pos-dot" style={{ background: d.color }} />
+            <span className="pos-legend-name">{d.name}</span>
+            <span className="pos-legend-pct">{pct(d.count)}%</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

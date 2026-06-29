@@ -25,6 +25,8 @@ const ACTIONS = [
     help: '为你选中的论断联网检索 2–3 条带出处的证据（名人名句 / 科学依据 / 历史事实）。\n只给查得到出处的，点一条即复制「原文 + 出处」，自行粘回去织入。\n联网检索会慢几秒，请稍候。' },
 ]
 
+const COPY_SINGLE = -2  // copiedIdx 哨兵：单段结果（缩减/扩展）的复制态，避开候选下标 0..n
+
 export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo, canUndo }) {
   const [activeSel, setActiveSel] = useState(null)  // 动作发起时冻结的区间
   const [action, setAction] = useState(null)        // 当前/上次执行的 ACTION
@@ -135,6 +137,7 @@ export default function AssistPanel({ sel, collapsed, onToggle, onApply, onUndo,
             )}
             <div className="ap-row">
               {!hasOptions && <button className="ap-apply" onClick={() => applyText(result)}>采用替换</button>}
+              {!hasOptions && <button className="ap-btn" onClick={() => copyText(COPY_SINGLE, result)}>{copiedIdx === COPY_SINGLE ? '已复制 ✓' : '复制'}</button>}
               <button className="ap-btn" onClick={() => run(action, activeSel)}>重新生成</button>
               <button className="ap-ghost" onClick={discard}>放弃</button>
             </div>
