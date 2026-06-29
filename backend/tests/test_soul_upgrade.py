@@ -60,6 +60,29 @@ def test_get_returns_golden_samples(client, db):
     assert g["golden_samples"] == ["片段一", "片段二"]
 
 
+def test_put_golden_samples_cleans_blanks_and_caps_200(client, db):
+    _seed_profile()
+    long = "字" * 250
+    r = client.put("/style-profile", json={
+        "golden_samples": ["  第一条样例片段  ", "", "   ", long],
+    })
+    assert r.status_code == 200
+    g = r.json()["golden_samples"]
+    assert len(g) == 2                       # 空白项被剔除
+    assert g[0] == "第一条样例片段"          # 两端空白去掉
+    assert len(g[1]) == 200                  # 超长截到 200 字
+
+
+def test_put_golden_samples_keeps_content_and_taboo(client, db):
+    import json
+    _seed_profile(content="原正文", taboo="我的禁令")
+    client.put("/style-profile", json={"golden_samples": ["用户自选的片段"]})
+    g = client.get("/style-profile").json()
+    assert g["golden_samples"] == ["用户自选的片段"]
+    assert g["content"] == "原正文"
+    assert g["taboo"] == "我的禁令"
+
+
 def test_get_golden_samples_bad_json_falls_back(client, db):
     _seed_profile(golden="{broken")
     assert client.get("/style-profile").json()["golden_samples"] == []

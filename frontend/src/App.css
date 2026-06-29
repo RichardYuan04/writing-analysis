@@ -1296,3 +1296,6 @@
 .soul-sub-h { font-size: 12px; color: var(--text-hint); }
 .soul-samples { display: flex; flex-direction: column; gap: 8px; }
 .soul-sample { margin: 0; padding: 8px 12px; border-left: 2px solid var(--accent-light); background: var(--panel2); border-radius: 0 8px 8px 0; font-family: var(--font-serif); font-size: 13px; line-height: 1.8; color: var(--text-secondary); white-space: pre-wrap; }
+.soul-sample-edit { display: flex; flex-direction: column; gap: 4px; padding-left: 10px; border-left: 2px solid var(--accent-light); }
+.soul-sample-foot { display: flex; align-items: center; justify-content: space-between; }
+.soul-sample-count { font-size: 11px; color: var(--text-hint); }

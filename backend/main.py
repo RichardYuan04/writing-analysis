@@ -1236,6 +1236,7 @@ def get_style_profile():
 class StyleProfileUpdateRequest(BaseModel):
     content: str | None = None
     taboo: str | None = None
+    golden_samples: list[str] | None = None
 
 
 @app.put("/style-profile")
@@ -1251,6 +1252,10 @@ def update_style_profile(req: StyleProfileUpdateRequest):
         row.generated_at = datetime.now()
     if req.taboo is not None:
         row.taboo = req.taboo
+    if req.golden_samples is not None:
+        # 去空白项、每条截到 200 字（与养成时的 cap 一致）
+        cleaned = [s.strip()[:200] for s in req.golden_samples if s and s.strip()]
+        row.golden_samples = json.dumps(cleaned, ensure_ascii=False)
     session.commit()
     try:
         ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
