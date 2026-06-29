@@ -43,7 +43,7 @@ anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 gemini_client = google_genai.Client(api_key=gemini_api_key) if gemini_api_key else None
 
-# DeepSeek（OpenAI 兼容接口），目前仅用于「读者视角」。配置全走 .env。
+# DeepSeek（OpenAI 兼容接口），用于读者视角 / 半成品仓库提炼 / 写作页续写。配置全走 .env。
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
@@ -909,16 +909,28 @@ class ContinueRequest(BaseModel):
 
 @app.post("/assist/continue")
 def assist_continue(data: ContinueRequest):
+    text = (data.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="续写内容不能为空")
     hints = [h.strip() for h in (data.hints or []) if h and h.strip()]
     hint_line = ("\n可参考的发展方向（不必照搬、不必逐条覆盖）：" + "；".join(hints)) if hints else ""
+    # 续写走 DeepSeek 默认模型；SOUL 正文/禁止项/黄金样例手动注入进 system
+    system = _assist_system(_load_soul_bundle())
     user = (
         "你是下面这段文字的作者本人，请接着已有的文字继续往下写。\n"
         "要求：承接原文的语气、思路与情感，自然往下展开 2-4 句；"
         "不要重复或改写已有内容，不要解释、不要加前缀，直接输出续写的部分。"
-        f"{hint_line}\n\n已有文字：{data.text.strip()}" + _ctx_line(data.context)
+        f"{hint_line}\n\n已有文字：{text}" + _ctx_line(data.context)
     )
-    return _assist_call(data, user, max_tokens=_cap(data.text, 1.2, 400, 1024),
-                        parse_options=False, model="claude-sonnet-4-6")
+    try:
+        # 推理模型，max_tokens 给足以容纳推理 + 续写
+        raw = _deepseek_chat(system, user, max_tokens=4000)
+        return {"result": raw.strip('「」""\'').strip()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[continue] error: {e}")
+        raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
 
 
 # ── 读者视角 ──
