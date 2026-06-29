@@ -1216,6 +1216,16 @@
 }
 .seal-ic svg { width: 18px; height: 18px; }
 
+/* 词性分布 + 高频词：双列流，窄屏自动单列 */
+.detail-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+.detail-pair .section { margin-bottom: 0; }
+
 /* 词性分布环形图 */
 .pos-donut-wrap { display: flex; align-items: center; gap: 28px; padding: 8px 4px; }
 .pos-donut { position: relative; flex-shrink: 0; width: 140px; height: 140px; }
