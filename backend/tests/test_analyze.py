@@ -11,6 +11,14 @@ def test_pos_distribution_includes_other_and_excludes_punct():
     assert "，" not in pos and "。" not in pos
 
 
-def test_pos_distribution_only_four_buckets():
+def test_pos_distribution_only_known_buckets():
     r = main.analyze_text("夜色很温柔，我慢慢走着，想着远方的人和事。")
-    assert set(r["pos_distribution"].keys()) <= {"名词", "动词", "形容词", "其他"}
+    assert set(r["pos_distribution"].keys()) <= {"名词", "动词", "形容词", "副词", "代词", "其他"}
+
+
+def test_pos_distribution_splits_adverb_and_pronoun():
+    # 「我」代词、「很/慢慢」副词，应各自单列，不再落进「其他」
+    r = main.analyze_text("我很认真地慢慢写着。")
+    pos = r["pos_distribution"]
+    assert pos.get("代词", 0) >= 1
+    assert pos.get("副词", 0) >= 1

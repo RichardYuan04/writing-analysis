@@ -335,7 +335,11 @@ def analyze_text(content: str):
             pos_counts['动词'] += 1
         elif flag.startswith('a'):
             pos_counts['形容词'] += 1
-        else:                                              # 副词/连词/代词/助词/数词等
+        elif flag.startswith('d'):
+            pos_counts['副词'] += 1
+        elif flag.startswith('r'):
+            pos_counts['代词'] += 1
+        else:                                              # 连词/介词/助词/数词/量词等
             pos_counts['其他'] += 1
     return {
         "word_count": word_count,
