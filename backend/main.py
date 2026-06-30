@@ -121,7 +121,15 @@ class StyleProfile(Base):
     generated_at = Column(DateTime, default=datetime.now)
     user_edited = Column(Integer, default=0)     # 0/1
     golden_samples = Column(Text)   # JSON 数组：养成时抽的 2–3 段黄金样例原文
-    taboo = Column(Text)            # 可编辑禁止项；空则回落 DEFAULT_TABOO
+    taboo = Column(Text)            # 弃用：禁止项已迁到 SoulSettings（三槽共用）；列保留仅供迁移读取
+    name = Column(Text)             # 用户自定义风格名；空→前端显示「风格 N」
+
+
+class SoulSettings(Base):
+    __tablename__ = "soul_settings"
+    id = Column(Integer, primary_key=True)   # 固定单行 id=1
+    active_profile_id = Column(Integer)      # 当前默认槽 id；无槽为 NULL
+    taboo = Column(Text)                      # 三槽共用禁止项；空回落 DEFAULT_TABOO
 
 
 class Draft(Base):
@@ -784,28 +792,32 @@ DEFAULT_TABOO = (
 )
 
 
+def _get_soul_settings(session):
+    """取全局 SOUL 配置单行；不存在则懒建（测试清表后兜底）。"""
+    s = session.query(SoulSettings).filter(SoulSettings.id == 1).first()
+    if not s:
+        s = SoulSettings(id=1, active_profile_id=None, taboo="")
+        session.add(s)
+        session.commit()
+    return s
+
+
 def _load_soul_bundle() -> dict:
-    """读 SOUL 正文 + 禁止项 + 黄金样例。禁止项为空回落 DEFAULT_TABOO。"""
+    """读「默认槽」的正文 + 黄金样例 + 共用禁止项。无默认槽则降级；禁止项空回落 DEFAULT_TABOO。"""
     session = Session()
     try:
-        row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+        s = _get_soul_settings(session)
+        taboo = (s.taboo or "").strip() or DEFAULT_TABOO
+        row = None
+        if s.active_profile_id is not None:
+            row = session.query(StyleProfile).filter(StyleProfile.id == s.active_profile_id).first()
         if not row:
-            return {"content": "", "taboo": DEFAULT_TABOO, "samples": []}
+            return {"content": "", "taboo": taboo, "samples": []}
         return {
             "content": (row.content or "").strip(),
-            "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
+            "taboo": taboo,
             "samples": _parse_or_empty(row.golden_samples),
         }
-    finally:
-        session.close()
-
-
-def _load_soul_content() -> str:
-    """从库里读当前 SOUL 文档的 content；没有则返回空串（走降级分支）。"""
-    session = Session()
-    try:
-        row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
-        return (row.content or "").strip() if row else ""
     finally:
         session.close()
 
@@ -1160,17 +1172,40 @@ SOUL_SYSTEM = (
 )
 
 
-@app.post("/style-profile/generate")
-def generate_style_profile(req: StyleProfileGenerateRequest):
-    if not req.essay_ids:
+def _profile_dict(row, session) -> dict:
+    """把一个风格槽序列化；new_essays_since = 该槽养成后新增/新建的随笔数。"""
+    new_count = 0
+    if row.generated_at:
+        new_count = session.query(Essay).filter(Essay.created_at > row.generated_at).count()
+    try:
+        rationale = json.loads(row.rationale) if row.rationale else {}
+    except Exception:
+        rationale = {}
+    return {
+        "id": row.id,
+        "name": row.name,
+        "content": row.content or "",
+        "rationale": rationale,
+        "source_essay_ids": _parse_or_empty(row.source_essay_ids),
+        "golden_samples": _parse_or_empty(row.golden_samples),
+        "generated_at": row.generated_at.isoformat() if row.generated_at else None,
+        "user_edited": int(row.user_edited or 0),
+        "new_essays_since": new_count,
+    }
+
+
+def _run_soul_generation(essay_ids):
+    """跑模型得到 (parsed, essays)；选篇为空/不存在/调用失败均抛 HTTPException。"""
+    if not essay_ids:
         raise HTTPException(status_code=400, detail="请至少选择一篇文章")
     session = Session()
-    essays = session.query(Essay).filter(Essay.id.in_(req.essay_ids)).order_by(Essay.date).all()
+    essays = session.query(Essay).filter(Essay.id.in_(essay_ids)).order_by(Essay.date).all()
     if not essays:
         session.close()
         raise HTTPException(status_code=400, detail="选中的文章不存在")
     portrait = compute_portrait(essays)
     excerpts = _sample_excerpts(essays)
+    session.close()
     try:
         message = anthropic_client.messages.create(
             model="claude-sonnet-4-6",
@@ -1182,105 +1217,152 @@ def generate_style_profile(req: StyleProfileGenerateRequest):
     except HTTPException:
         raise
     except Exception as e:
-        session.close()
         print(f"[soul] generate error: {e}")
         raise HTTPException(status_code=502, detail="AI 调用失败，请稍后再试")
+    return parsed, essays
 
-    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
-    if not row:
-        row = StyleProfile(id=1)
-        session.add(row)
+
+def _apply_generation(row, parsed, essays):
+    """把养成结果写入槽（不动 name）。"""
     row.content = parsed["soul"]
     row.rationale = json.dumps(parsed["rationale"], ensure_ascii=False)
     row.source_essay_ids = json.dumps([e.id for e in essays])
     row.generated_at = datetime.now()
     row.user_edited = 0
     row.golden_samples = json.dumps(_golden_samples(essays), ensure_ascii=False)
-    session.commit()
-    result = {
-        "content": row.content,
-        "rationale": parsed["rationale"],
-        "source_essay_ids": [e.id for e in essays],
-        "generated_at": row.generated_at.isoformat(),
-        "user_edited": 0,
-        "golden_samples": _parse_or_empty(row.golden_samples),
-    }
-    session.close()
-    return result
-
-
-@app.get("/style-profile")
-def get_style_profile():
-    session = Session()
-    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
-    if not row:
-        session.close()
-        return {"exists": False}
-    # 自上次养成后，更新过/新建过的文章数（按 created_at 粗略估计）
-    new_count = 0
-    if row.generated_at:
-        new_count = session.query(Essay).filter(Essay.created_at > row.generated_at).count()
-    try:
-        rationale = json.loads(row.rationale) if row.rationale else {}
-    except Exception:
-        rationale = {}
-    try:
-        ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
-    except Exception:
-        ids = []
-    result = {
-        "exists": True,
-        "content": row.content or "",
-        "rationale": rationale,
-        "source_essay_ids": ids,
-        "generated_at": row.generated_at.isoformat() if row.generated_at else None,
-        "user_edited": int(row.user_edited or 0),
-        "golden_samples": _parse_or_empty(row.golden_samples),
-        "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
-        "new_essays_since": new_count,
-    }
-    session.close()
-    return result
 
 
 class StyleProfileUpdateRequest(BaseModel):
+    name: str | None = None
     content: str | None = None
-    taboo: str | None = None
     golden_samples: list[str] | None = None
 
 
-@app.put("/style-profile")
-def update_style_profile(req: StyleProfileUpdateRequest):
+class SoulSettingsUpdateRequest(BaseModel):
+    taboo: str | None = None
+
+
+@app.get("/style-profiles")
+def list_style_profiles():
     session = Session()
-    row = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+    s = _get_soul_settings(session)
+    rows = session.query(StyleProfile).order_by(StyleProfile.id).all()
+    out = {
+        "active_id": s.active_profile_id,
+        "taboo": (s.taboo or "").strip() or DEFAULT_TABOO,
+        "profiles": [_profile_dict(r, session) for r in rows],
+    }
+    session.close()
+    return out
+
+
+@app.post("/style-profiles/generate")
+def create_style_profile(req: StyleProfileGenerateRequest):
+    session = Session()
+    count = session.query(StyleProfile).count()
+    session.close()
+    if count >= 3:
+        raise HTTPException(status_code=400, detail="最多 3 个风格")
+    parsed, essays = _run_soul_generation(req.essay_ids)
+    session = Session()
+    row = StyleProfile()
+    _apply_generation(row, parsed, essays)
+    session.add(row)
+    session.flush()
+    s = _get_soul_settings(session)
+    if s.active_profile_id is None:        # 从 0 槽建出第一个 → 自动设默认
+        s.active_profile_id = row.id
+    session.commit()
+    out = _profile_dict(row, session)
+    session.close()
+    return out
+
+
+@app.post("/style-profiles/{pid}/generate")
+def regenerate_style_profile(pid: int, req: StyleProfileGenerateRequest):
+    session = Session()
+    exists = session.query(StyleProfile).filter(StyleProfile.id == pid).first() is not None
+    session.close()
+    if not exists:
+        raise HTTPException(status_code=404, detail="风格不存在")
+    parsed, essays = _run_soul_generation(req.essay_ids)
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == pid).first()
     if not row:
-        row = StyleProfile(id=1, source_essay_ids="[]", rationale="{}")
-        session.add(row)
+        session.close()
+        raise HTTPException(status_code=404, detail="风格不存在")
+    _apply_generation(row, parsed, essays)   # name 不变
+    session.commit()
+    out = _profile_dict(row, session)
+    session.close()
+    return out
+
+
+@app.put("/style-profiles/{pid}")
+def update_one_style_profile(pid: int, req: StyleProfileUpdateRequest):
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == pid).first()
+    if not row:
+        session.close()
+        raise HTTPException(status_code=404, detail="风格不存在")
+    if req.name is not None:
+        row.name = (req.name or "").strip() or None
     if req.content is not None:
         row.content = (req.content or "").strip()
         row.user_edited = 1
         row.generated_at = datetime.now()
-    if req.taboo is not None:
-        row.taboo = req.taboo
     if req.golden_samples is not None:
-        # 去空白项、每条截到 200 字（与养成时的 cap 一致）
-        cleaned = [s.strip()[:200] for s in req.golden_samples if s and s.strip()]
+        cleaned = [x.strip()[:200] for x in req.golden_samples if x and x.strip()]
         row.golden_samples = json.dumps(cleaned, ensure_ascii=False)
     session.commit()
-    try:
-        ids = json.loads(row.source_essay_ids) if row.source_essay_ids else []
-    except Exception:
-        ids = []
-    result = {
-        "content": row.content or "",
-        "taboo": (row.taboo or "").strip() or DEFAULT_TABOO,
-        "golden_samples": _parse_or_empty(row.golden_samples),
-        "source_essay_ids": ids,
-        "user_edited": int(row.user_edited or 0),
-        "generated_at": row.generated_at.isoformat() if row.generated_at else None,
-    }
+    out = _profile_dict(row, session)
     session.close()
-    return result
+    return out
+
+
+@app.post("/style-profiles/{pid}/activate")
+def activate_style_profile(pid: int):
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == pid).first()
+    if not row:
+        session.close()
+        raise HTTPException(status_code=404, detail="风格不存在")
+    s = _get_soul_settings(session)
+    s.active_profile_id = pid
+    session.commit()
+    session.close()
+    return {"active_id": pid}
+
+
+@app.delete("/style-profiles/{pid}")
+def delete_style_profile(pid: int):
+    session = Session()
+    row = session.query(StyleProfile).filter(StyleProfile.id == pid).first()
+    if not row:
+        session.close()
+        raise HTTPException(status_code=404, detail="风格不存在")
+    session.delete(row)
+    session.flush()
+    s = _get_soul_settings(session)
+    if s.active_profile_id == pid:        # 删的是默认 → 回退到剩余最小 id（无则 NULL）
+        nxt = session.query(StyleProfile).order_by(StyleProfile.id).first()
+        s.active_profile_id = nxt.id if nxt else None
+    session.commit()
+    active = s.active_profile_id
+    session.close()
+    return {"active_id": active}
+
+
+@app.put("/soul-settings")
+def update_soul_settings(req: SoulSettingsUpdateRequest):
+    session = Session()
+    s = _get_soul_settings(session)
+    if req.taboo is not None:
+        s.taboo = req.taboo
+    session.commit()
+    taboo = (s.taboo or "").strip() or DEFAULT_TABOO
+    session.close()
+    return {"taboo": taboo}
 
 
 # ── 草稿箱 ──
@@ -1720,6 +1802,34 @@ def migrate_vault_db():
 
 
 migrate_vault_db()
+
+
+def migrate_soul_slots():
+    """SOUL 多槽迁移：style_profile 加 name 列；建 soul_settings 单行，
+    把现有单槽 id=1 设为默认、其 taboo 搬为共用。幂等。"""
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE style_profile ADD COLUMN name TEXT"))
+            conn.commit()
+        except Exception:
+            pass
+    Base.metadata.create_all(engine)   # 确保 soul_settings 表存在（老库）
+    session = Session()
+    try:
+        s = session.query(SoulSettings).filter(SoulSettings.id == 1).first()
+        if not s:
+            existing = session.query(StyleProfile).filter(StyleProfile.id == 1).first()
+            session.add(SoulSettings(
+                id=1,
+                active_profile_id=existing.id if existing else None,
+                taboo=((existing.taboo or "").strip() if existing else ""),
+            ))
+            session.commit()
+    finally:
+        session.close()
+
+
+migrate_soul_slots()
 
 # ── Embedding 模型（懒加载） ──
 

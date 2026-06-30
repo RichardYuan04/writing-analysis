@@ -30,6 +30,10 @@ def db():
         except Exception:
             pass
         try:
+            s.query(main.SoulSettings).delete()
+        except Exception:
+            pass
+        try:
             s.query(main.Draft).delete()
         except Exception:
             pass

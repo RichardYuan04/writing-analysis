@@ -85,13 +85,13 @@ def test_parse_soul_output_fallback_no_marker():
 
 
 def test_generate_requires_essay_ids(client, db):
-    r = client.post("/style-profile/generate", json={"essay_ids": []})
+    r = client.post("/style-profiles/generate", json={"essay_ids": []})
     assert r.status_code == 400
 
 
-def test_generate_creates_single_row_and_uses_sonnet(client, seed_essays, mock_anthropic):
+def test_generate_creates_row_and_uses_sonnet(client, db, seed_essays, mock_anthropic):
     mock_anthropic.set_text("【SOUL】\n偏好短句，善用感官意象，情绪克制。\n\n【节奏】短句为主\n【意象】感官意象\n【情绪】克制\n【用词】书面\n【手法】留白")
-    r = client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    r = client.post("/style-profiles/generate", json={"essay_ids": seed_essays})
     assert r.status_code == 200
     body = r.json()
     assert body["content"].startswith("偏好短句")
@@ -99,7 +99,6 @@ def test_generate_creates_single_row_and_uses_sonnet(client, seed_essays, mock_a
     assert sorted(body["source_essay_ids"]) == sorted(seed_essays)
     # 用了 Sonnet
     assert mock_anthropic.captured.get("model") == "claude-sonnet-4-6"
-    # 落库单行
     s = main.Session()
     assert s.query(main.StyleProfile).count() == 1
     row = s.query(main.StyleProfile).first()
@@ -107,51 +106,49 @@ def test_generate_creates_single_row_and_uses_sonnet(client, seed_essays, mock_a
     s.close()
 
 
-def test_generate_is_idempotent_single_row(client, seed_essays, mock_anthropic):
+def test_generate_creates_separate_slots(client, db, seed_essays, mock_anthropic):
     mock_anthropic.set_text("【SOUL】\n第一版")
-    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    client.post("/style-profiles/generate", json={"essay_ids": seed_essays})
     mock_anthropic.set_text("【SOUL】\n第二版")
-    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    client.post("/style-profiles/generate", json={"essay_ids": seed_essays})
     s = main.Session()
-    assert s.query(main.StyleProfile).count() == 1  # upsert，不新增第二行
-    assert s.query(main.StyleProfile).first().content == "第二版"
+    assert s.query(main.StyleProfile).count() == 2   # 各建一槽，不再 upsert 单行
     s.close()
 
 
-def test_get_style_profile_empty(client, db):
-    r = client.get("/style-profile")
+def test_list_style_profiles_empty(client, db):
+    r = client.get("/style-profiles")
     assert r.status_code == 200
-    assert r.json() == {"exists": False}
-
-
-def test_get_style_profile_after_generate(client, seed_essays, mock_anthropic):
-    mock_anthropic.set_text("【SOUL】\n偏好短句。\n\n【节奏】短")
-    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
-    r = client.get("/style-profile")
     body = r.json()
-    assert body["exists"] is True
-    assert body["content"] == "偏好短句。"
-    assert body["rationale"]["rhythm"] == "短"
-    assert "generated_at" in body
-    assert body["new_essays_since"] == 0  # 生成后没有更新的文章
+    assert body["active_id"] is None
+    assert body["profiles"] == []
+    assert body["taboo"] == main.DEFAULT_TABOO
 
 
-def test_put_style_profile_sets_user_edited(client, seed_essays, mock_anthropic):
+def test_list_style_profiles_after_generate(client, db, seed_essays, mock_anthropic):
+    mock_anthropic.set_text("【SOUL】\n偏好短句。\n\n【节奏】短")
+    g = client.post("/style-profiles/generate", json={"essay_ids": seed_essays}).json()
+    body = client.get("/style-profiles").json()
+    assert body["active_id"] == g["id"]
+    p = body["profiles"][0]
+    assert p["content"] == "偏好短句。"
+    assert p["rationale"]["rhythm"] == "短"
+    assert p["new_essays_since"] == 0  # 生成后没有更新的文章
+
+
+def test_put_style_profile_sets_user_edited(client, db, seed_essays, mock_anthropic):
     mock_anthropic.set_text("【SOUL】\n原始版")
-    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
-    r = client.put("/style-profile", json={"content": "我手改后的风格串"})
+    g = client.post("/style-profiles/generate", json={"essay_ids": seed_essays}).json()
+    r = client.put(f"/style-profiles/{g['id']}", json={"content": "我手改后的风格串"})
     assert r.status_code == 200
     assert r.json()["content"] == "我手改后的风格串"
     assert r.json()["user_edited"] == 1
-    # source_essay_ids 不变
-    assert sorted(r.json()["source_essay_ids"]) == sorted(seed_essays)
+    assert sorted(r.json()["source_essay_ids"]) == sorted(seed_essays)  # 选篇不变
 
 
-def test_put_style_profile_without_existing_creates_row(client, db):
-    r = client.put("/style-profile", json={"content": "凭空写一版"})
-    assert r.status_code == 200
-    assert r.json()["content"] == "凭空写一版"
-    assert r.json()["user_edited"] == 1
+def test_put_missing_slot_404(client, db):
+    r = client.put("/style-profiles/9999", json={"content": "凭空写一版"})
+    assert r.status_code == 404
 
 
 def test_assist_reduce_uses_haiku(client, db, mock_anthropic):
@@ -176,10 +173,10 @@ def test_assist_synonyms_and_expand_use_sonnet(client, db, mock_anthropic):
     assert mock_anthropic.captured["model"] == "claude-sonnet-4-6"
 
 
-def test_assist_injects_soul_when_present(client, seed_essays, mock_anthropic):
-    # 先造一份 SOUL 文档
+def test_assist_injects_soul_when_present(client, db, seed_essays, mock_anthropic):
+    # 先造一份 SOUL 文档（自动成为默认槽）
     mock_anthropic.set_text("【SOUL】\n偏好短句，情绪克制。")
-    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    client.post("/style-profiles/generate", json={"essay_ids": seed_essays})
     # 再调 reduce，断言 system 注入了 SOUL 内容
     mock_anthropic.set_text("压缩结果")
     client.post("/assist/reduce", json={"text": "一段较长的需要压缩的文字。"})
@@ -190,7 +187,7 @@ def test_assist_injects_soul_when_present(client, seed_essays, mock_anthropic):
 def test_assist_metaphor_does_not_inject_soul(client, seed_essays, mock_anthropic):
     # 即使存在 SOUL 文档，比喻也完全放开、不注入它
     mock_anthropic.set_text("【SOUL】\n善用感官意象，情绪克制。")
-    client.post("/style-profile/generate", json={"essay_ids": seed_essays})
+    client.post("/style-profiles/generate", json={"essay_ids": seed_essays})
     mock_anthropic.set_text("1. 像一根被抽走的细线\n2. 像午后忽然停电")
     client.post("/assist/metaphor", json={"text": "一种说不清的失落。"})
     sys_prompt = mock_anthropic.captured["system"]
