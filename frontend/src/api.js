@@ -30,9 +30,13 @@ export const deleteEssayLetter = (id, letterId) => api.delete(`/essays/${id}/let
 export const getPortrait = () => api.get('/stats/portrait')
 export const deepAnalysis = () => api.post('/stats/deep-analysis')
 
-export const getStyleProfile = () => api.get('/style-profile')
-export const generateStyleProfile = (essayIds) => api.post('/style-profile/generate', { essay_ids: essayIds })
-export const saveStyleProfile = (data) => api.put('/style-profile', data)
+export const listStyleProfiles = () => api.get('/style-profiles')
+export const generateStyleProfile = (essayIds) => api.post('/style-profiles/generate', { essay_ids: essayIds })
+export const regenerateStyleProfile = (id, essayIds) => api.post(`/style-profiles/${id}/generate`, { essay_ids: essayIds })
+export const updateStyleProfile = (id, data) => api.put(`/style-profiles/${id}`, data)
+export const activateStyleProfile = (id) => api.post(`/style-profiles/${id}/activate`)
+export const deleteStyleProfile = (id) => api.delete(`/style-profiles/${id}`)
+export const saveSoulSettings = (data) => api.put('/soul-settings', data)
 
 export const getOverview = (startDate, endDate) => {
   const params = {}
