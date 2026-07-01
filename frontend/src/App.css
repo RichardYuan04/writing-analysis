@@ -1357,6 +1357,14 @@
 /* SOUL 面板：禁止项 / 黄金样例 子区 */
 .soul-sub { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); display: flex; flex-direction: column; gap: 8px; }
 .soul-sub-h { font-size: 12px; color: var(--text-hint); }
+.soul-sub-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: none; border: none; cursor: pointer; padding: 2px 0;
+  font-size: 12px; color: var(--text-hint); transition: color .15s;
+}
+.soul-sub-toggle:hover { color: var(--text-secondary); }
+.soul-caret { font-size: 10px; color: var(--accent); flex-shrink: 0; }
+.soul-sub-count { margin-left: auto; flex-shrink: 0; font-size: 11px; color: var(--text-hint); }
 .soul-samples { display: flex; flex-direction: column; gap: 8px; }
 .soul-sample { margin: 0; padding: 8px 12px; border-left: 2px solid var(--accent-light); background: var(--panel2); border-radius: 0 8px 8px 0; font-family: var(--font-serif); font-size: 13px; line-height: 1.8; color: var(--text-secondary); white-space: pre-wrap; }
 .soul-sample-edit { display: flex; flex-direction: column; gap: 4px; padding-left: 10px; border-left: 2px solid var(--accent-light); }

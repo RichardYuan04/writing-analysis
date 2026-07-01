@@ -30,6 +30,8 @@ export default function SoulDocPanel() {
 
   const [busy, setBusy] = useState('')                    // '' | 'generating' | 'saving'
   const [showRationale, setShowRationale] = useState(false)
+  const [samplesOpen, setSamplesOpen] = useState(false)   // 黄金样例默认收起，降噪
+  const [tabooOpen, setTabooOpen] = useState(false)       // 禁止项默认收起
   const [savedTip, setSavedTip] = useState(false)
 
   const selected = profiles.find(p => p.id === selectedId) || null
@@ -245,39 +247,55 @@ export default function SoulDocPanel() {
 
           {/* 黄金样例（本槽） */}
           <div className="soul-sub">
-            <div className="soul-sub-h">黄金样例（本风格的语感参照，可改：换成你自选片段，每条 ≤200 字）</div>
-            <div className="soul-samples">
-              {samplesDraft.map((s, i) => (
-                <div key={i} className="soul-sample-edit">
-                  <textarea className="soul-textarea" value={s} maxLength={200} rows={3}
-                    placeholder="粘贴一段你满意的原文片段…" onChange={e => updateSample(i, e.target.value)} />
-                  <div className="soul-sample-foot">
-                    <span className="soul-sample-count">{s.length}/200</span>
-                    <button className="soul-link" onClick={() => removeSample(i)}>删除</button>
-                  </div>
+            <button className="soul-sub-toggle" onClick={() => setSamplesOpen(o => !o)}>
+              <span className="soul-caret">{samplesOpen ? '▾' : '▸'}</span>
+              黄金样例（本风格的语感参照，可改：换成你自选片段，每条 ≤200 字）
+              <span className="soul-sub-count">{samplesDraft.length} 条{samplesDirty ? ' · 未保存' : ''}</span>
+            </button>
+            {samplesOpen && (
+              <>
+                <div className="soul-samples">
+                  {samplesDraft.map((s, i) => (
+                    <div key={i} className="soul-sample-edit">
+                      <textarea className="soul-textarea" value={s} maxLength={200} rows={3}
+                        placeholder="粘贴一段你满意的原文片段…" onChange={e => updateSample(i, e.target.value)} />
+                      <div className="soul-sample-foot">
+                        <span className="soul-sample-count">{s.length}/200</span>
+                        <button className="soul-link" onClick={() => removeSample(i)}>删除</button>
+                      </div>
+                    </div>
+                  ))}
+                  {samplesDraft.length === 0 && (
+                    <div className="soul-hint">还没有样例。点「＋ 添加一条」粘贴你满意的片段。</div>
+                  )}
                 </div>
-              ))}
-              {samplesDraft.length === 0 && (
-                <div className="soul-hint">还没有样例。点「＋ 添加一条」粘贴你满意的片段。</div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <button className="soul-btn-ghost" onClick={addSample}>＋ 添加一条</button>
-              <button className="soul-btn-primary" disabled={busy === 'saving' || !samplesDirty} onClick={saveSamples}>
-                {busy === 'saving' ? '保存中…' : '保存样例'}
-              </button>
-            </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <button className="soul-btn-ghost" onClick={addSample}>＋ 添加一条</button>
+                  <button className="soul-btn-primary" disabled={busy === 'saving' || !samplesDirty} onClick={saveSamples}>
+                    {busy === 'saving' ? '保存中…' : '保存样例'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
       {/* 全局共用禁止项 */}
       <div className="soul-sub">
-        <div className="soul-sub-h">禁止项（去 AI 腔，三种风格共用，对所有写作工具生效，可改）</div>
-        <textarea className="soul-textarea" value={tabooDraft} onChange={e => setTabooDraft(e.target.value)} rows={7} />
-        <button className="soul-btn-primary" disabled={busy === 'saving' || tabooDraft === taboo} onClick={saveTaboo}>
-          {busy === 'saving' ? '保存中…' : '保存禁止项'}
+        <button className="soul-sub-toggle" onClick={() => setTabooOpen(o => !o)}>
+          <span className="soul-caret">{tabooOpen ? '▾' : '▸'}</span>
+          禁止项（去 AI 腔，三种风格共用，对所有写作工具生效，可改）
+          {tabooDraft !== taboo && <span className="soul-sub-count">未保存</span>}
         </button>
+        {tabooOpen && (
+          <>
+            <textarea className="soul-textarea" value={tabooDraft} onChange={e => setTabooDraft(e.target.value)} rows={7} />
+            <button className="soul-btn-primary" disabled={busy === 'saving' || tabooDraft === taboo} onClick={saveTaboo}>
+              {busy === 'saving' ? '保存中…' : '保存禁止项'}
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
